@@ -1,0 +1,14 @@
+name = "amc-alerts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".vercel/output/static"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "amc-alerts-db"
+database_id = "8e643a96-458b-44db-a66e-df4654f8fd76"
+
+[vars]
+# RESEND_API_KEY = set in CF Pages dashboard
+
+# Cron trigger set in CF Pages dashboard: */15 * * * *
