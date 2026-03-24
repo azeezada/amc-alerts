@@ -1623,6 +1623,98 @@ export default function Home() {
                 />
               ))}
             </div>
+
+            {/* ===== MOVIE INFO SECTION ===== */}
+            <div style={{ marginTop: "var(--space-2xl)", display: "flex", flexDirection: "column", gap: "var(--space-2xl)" }}>
+
+              {/* Ratings */}
+              <div className="card" style={{ padding: "var(--space-lg)" }}>
+                <h3 style={{ margin: "0 0 var(--space-base)", fontSize: 18, fontWeight: 600, color: "var(--text-primary)" }}>
+                  Ratings
+                </h3>
+                <div style={{ display: "flex", gap: "var(--space-xl)", flexWrap: "wrap" }}>
+                  {[
+                    { source: "IMDb", score: "8.2/10", color: "var(--gold)" },
+                    { source: "Rotten Tomatoes", score: "96%", color: "#FA320A" },
+                    { source: "Audience Score", score: "92%", color: "#5BABF2" },
+                  ].map((r) => (
+                    <div key={r.source} style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
+                      <span style={{ fontSize: 28, fontWeight: 800, color: r.color, fontVariantNumeric: "tabular-nums" }}>
+                        {r.score}
+                      </span>
+                      <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        {r.source}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ margin: "var(--space-base) 0 0", fontSize: "var(--text-sm)", color: "var(--text-tertiary)" }}>
+                  Based on the novel by Andy Weir. Directed by Phil Lord &amp; Christopher Miller.
+                  Starring Ryan Gosling.
+                </p>
+              </div>
+
+              {/* Trailer */}
+              <div className="card" style={{ padding: "var(--space-lg)" }}>
+                <h3 style={{ margin: "0 0 var(--space-base)", fontSize: 18, fontWeight: 600, color: "var(--text-primary)" }}>
+                  Official Trailer
+                </h3>
+                <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: 8, overflow: "hidden", background: "var(--bg-elevated)" }}>
+                  <iframe
+                    src="https://www.youtube.com/embed/QCLXO7mCpbA"
+                    title="Project Hail Mary — Official Trailer"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
+                  />
+                </div>
+              </div>
+
+              {/* Why IMAX 70mm */}
+              <div className="card" style={{ padding: "var(--space-lg)" }}>
+                <h3 style={{ margin: "0 0 var(--space-base)", fontSize: 18, fontWeight: 600, color: "var(--text-primary)" }}>
+                  Why IMAX 70mm?
+                </h3>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "var(--space-lg)" }}>
+                  <div>
+                    <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>
+                      18K Resolution Equivalent
+                    </div>
+                    <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: "var(--leading-normal)" }}>
+                      IMAX 70mm film captures roughly 18,000 lines of horizontal resolution — far exceeding
+                      any digital format. Every frame contains extraordinary detail.
+                    </p>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>
+                      1.43:1 Aspect Ratio
+                    </div>
+                    <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: "var(--leading-normal)" }}>
+                      IMAX 70mm fills the entire screen vertically — 40% more image than standard widescreen.
+                      You see what the director intended, not a cropped version.
+                    </p>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>
+                      Analog Film Look
+                    </div>
+                    <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: "var(--leading-normal)" }}>
+                      Real photochemical film has organic grain, richer colors, and a cinematic depth
+                      that digital projection cannot replicate. This is how movies were meant to look.
+                    </p>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>
+                      Only 3 NYC Screens
+                    </div>
+                    <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: "var(--leading-normal)" }}>
+                      True IMAX 70mm projectors are rare — only AMC Lincoln Square has one in NYC.
+                      These screenings sell out fast and may run for a limited time.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </section>
         )}
 
