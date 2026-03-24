@@ -202,7 +202,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 /* =========================================================================
-   Showtime Skeleton
+   Skeleton Components
    ========================================================================= */
 function ShowtimeSkeleton() {
   return (
@@ -210,10 +210,66 @@ function ShowtimeSkeleton() {
       {[1, 2, 3].map((i) => (
         <div
           key={i}
-          className="skeleton"
-          style={{ height: 48, animationDelay: `${i * 150}ms` }}
-        />
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "var(--bg-elevated)",
+            borderRadius: 6,
+            padding: "var(--space-md) var(--space-base)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-md)" }}>
+            <div className="skeleton" style={{ width: 80, height: 20, animationDelay: `${i * 100}ms` }} />
+            <div className="skeleton" style={{ width: 64, height: 22, borderRadius: 4, animationDelay: `${i * 100 + 50}ms` }} />
+          </div>
+          <div className="skeleton" style={{ width: 100, height: 32, borderRadius: 4, animationDelay: `${i * 100 + 100}ms` }} />
+        </div>
       ))}
+    </div>
+  );
+}
+
+function ResultsSkeleton() {
+  return (
+    <div style={{ padding: "var(--space-xl) 0" }}>
+      {/* Header skeleton */}
+      <div style={{ marginBottom: "var(--space-lg)" }}>
+        <div className="skeleton" style={{ width: 200, height: 28, marginBottom: 8 }} />
+        <div className="skeleton" style={{ width: 300, height: 16 }} />
+      </div>
+      {/* Theater tabs skeleton */}
+      <div style={{ display: "flex", gap: "var(--space-sm)", marginBottom: "var(--space-base)" }}>
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="skeleton" style={{ width: 140, height: 36, borderRadius: 20, animationDelay: `${i * 80}ms` }} />
+        ))}
+      </div>
+      {/* Format pills skeleton */}
+      <div style={{ display: "flex", gap: "var(--space-sm)", marginBottom: "var(--space-lg)" }}>
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="skeleton" style={{ width: 100, height: 36, borderRadius: 20, animationDelay: `${i * 80}ms` }} />
+        ))}
+      </div>
+      {/* Date cards skeleton */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "var(--space-base)" }}>
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="card"
+            style={{ padding: "var(--space-lg)", animationDelay: `${i * 80}ms` } as React.CSSProperties}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "var(--space-base)" }}>
+              <div>
+                <div className="skeleton" style={{ width: 80, height: 12, marginBottom: 6, animationDelay: `${i * 100}ms` }} />
+                <div className="skeleton" style={{ width: 120, height: 22, animationDelay: `${i * 100 + 50}ms` }} />
+              </div>
+              <div className="skeleton" style={{ width: 80, height: 24, borderRadius: 4, animationDelay: `${i * 100 + 100}ms` }} />
+            </div>
+            <div style={{ borderTop: "1px dashed var(--border-subtle)", margin: "0 calc(-1 * var(--space-lg))", marginBottom: "var(--space-base)" }} />
+            <ShowtimeSkeleton />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1546,29 +1602,8 @@ export default function Home() {
               theaterSlug={selectedTheater}
             />
 
-            {/* Loading spinner */}
-            {loadingStatus && !status && (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  padding: "var(--space-3xl) 0",
-                  gap: "var(--space-base)",
-                }}
-              >
-                <div className="projector-spinner" />
-                <p
-                  style={{
-                    color: "var(--text-tertiary)",
-                    fontSize: "var(--text-sm)",
-                    margin: 0,
-                  }}
-                >
-                  Checking showtimes&hellip;
-                </p>
-              </div>
-            )}
+            {/* Loading skeleton */}
+            {loadingStatus && !status && <ResultsSkeleton />}
 
             {/* Date cards grid */}
             <div
