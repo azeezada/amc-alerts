@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAllTheatersAndFormats, THEATERS, FORMATS, TARGET_DATES } from "@/lib/scraper";
 import { getCfEnv, type D1Database } from "@/lib/cf-env";
+import { POPULAR_THEATERS } from "@/lib/theaters";
 
 export const runtime = "edge";
 
@@ -12,13 +13,41 @@ interface CacheRow {
   checked_at: string;
 }
 
-function makeKey(theaterSlug: string, formatTag: string, date: string) {
-  return `${theaterSlug}__${formatTag}__${date}`;
+function makeKey(theaterSlug: string, formatTag: string, date: string, movieSlug: string) {
+  return `${movieSlug}__${theaterSlug}__${formatTag}__${date}`;
 }
 
-export async function GET(_request: NextRequest) {
+function resolveTheaters(slugs: string[]): { slug: string; name: string; neighborhood: string }[] {
+  return slugs.map((slug) => {
+    for (const theaters of Object.values(POPULAR_THEATERS)) {
+      const found = theaters.find((t) => t.slug === slug);
+      if (found) return { slug: found.slug, name: found.name, neighborhood: found.neighborhood };
+    }
+    // Fallback for custom slugs
+    const name = slug
+      .replace(/-/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+    return { slug, name, neighborhood: "" };
+  });
+}
+
+export async function GET(request: NextRequest) {
   const env = await getCfEnv();
   const db: D1Database | undefined = env.DB;
+
+  // Parse optional query params for dynamic usage
+  const theatersParam = request.nextUrl.searchParams.get("theaters");
+  const movieParam = request.nextUrl.searchParams.get("movie");
+  const datesParam = request.nextUrl.searchParams.get("dates");
+
+  const movieSlug = movieParam || "project-hail-mary-76779";
+  const theaterSlugs = theatersParam ? theatersParam.split(",").filter(Boolean) : null;
+  const dateList = datesParam ? datesParam.split(",").filter(Boolean) : null;
+
+  // Use defaults if no params
+  const theaterList = theaterSlugs ? resolveTheaters(theaterSlugs) : THEATERS;
+  const dates = dateList || TARGET_DATES;
+  const formatList = FORMATS;
 
   try {
     // Check D1 cache if available
@@ -28,16 +57,16 @@ export async function GET(_request: NextRequest) {
       const theaterMap: Record<string, any> = {};
       let allCached = true;
 
-      outer: for (const theater of THEATERS) {
+      outer: for (const theater of theaterList) {
         theaterMap[theater.slug] = {
           name: theater.name,
           neighborhood: theater.neighborhood,
           formats: {} as Record<string, { dates: Record<string, unknown> }>,
         };
-        for (const format of FORMATS) {
+        for (const format of formatList) {
           theaterMap[theater.slug].formats[format.tag] = { dates: {} };
-          for (const date of TARGET_DATES) {
-            const key = makeKey(theater.slug, format.tag, date);
+          for (const date of dates) {
+            const key = makeKey(theater.slug, format.tag, date, movieSlug);
             const row = await db
               .prepare("SELECT cache_key, data, checked_at FROM showtime_cache_v2 WHERE cache_key = ?")
               .bind(key)
@@ -65,16 +94,20 @@ export async function GET(_request: NextRequest) {
     }
 
     // Fetch fresh data
-    const result = await checkAllTheatersAndFormats();
+    const result = await checkAllTheatersAndFormats({
+      theaters: theaterList,
+      dates,
+      movieSlug,
+      formats: formatList,
+    });
 
-    // Cache in D1 if available (using v2 table with composite key)
+    // Cache in D1 if available
     if (db) {
-      // Best-effort: table may not exist yet, fallback gracefully
       try {
         for (const [theaterSlug, theaterData] of Object.entries(result.theaters)) {
           for (const [formatTag, formatData] of Object.entries(theaterData.formats)) {
             for (const [date, dateResult] of Object.entries(formatData.dates)) {
-              const key = makeKey(theaterSlug, formatTag, date);
+              const key = makeKey(theaterSlug, formatTag, date, movieSlug);
               await db
                 .prepare(
                   "INSERT OR REPLACE INTO showtime_cache_v2 (cache_key, data, checked_at) VALUES (?, ?, datetime('now'))"

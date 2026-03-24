@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 
 /* =========================================================================
    Types
@@ -37,19 +37,25 @@ interface MultiStatusResponse {
   error?: string;
 }
 
-const TARGET_DATES = [
-  "2026-04-01",
-  "2026-04-02",
-  "2026-04-03",
-  "2026-04-04",
-  "2026-04-05",
-];
+interface TheaterInfo {
+  slug: string;
+  name: string;
+  neighborhood: string;
+  hasImax70mm?: boolean;
+}
 
-const THEATER_LIST = [
-  { slug: "amc-lincoln-square-13", name: "AMC Lincoln Square", neighborhood: "Upper West Side" },
-  { slug: "amc-empire-25", name: "AMC Empire 25", neighborhood: "Midtown" },
-  { slug: "amc-kips-bay-15", name: "AMC Kips Bay 15", neighborhood: "Kips Bay" },
-];
+interface MarketInfo {
+  slug: string;
+  name: string;
+  state: string;
+  theaterCount: number;
+}
+
+interface MovieInfo {
+  slug: string;
+  title: string;
+  formats: string[];
+}
 
 const FORMAT_LIST = [
   { tag: "imax70mm", label: "IMAX 70mm", priority: 1 },
@@ -69,14 +75,36 @@ function formatDateNice(dateStr: string): { weekday: string; date: string } {
   };
 }
 
-/** Find the best theater+format combo that has any availability. */
+function toDateStr(d: Date): string {
+  return d.toISOString().split("T")[0];
+}
+
+function generateDateRange(start: string, end: string): string[] {
+  const dates: string[] = [];
+  const s = new Date(start + "T00:00:00");
+  const e = new Date(end + "T00:00:00");
+  while (s <= e) {
+    dates.push(toDateStr(s));
+    s.setDate(s.getDate() + 1);
+  }
+  return dates;
+}
+
+function getDefaultDates(): { start: string; end: string } {
+  const today = new Date();
+  const end = new Date(today);
+  end.setDate(end.getDate() + 6);
+  return { start: toDateStr(today), end: toDateStr(end) };
+}
+
 function findBestAvailable(
-  theaters: Record<string, TheaterData> | undefined
+  theaters: Record<string, TheaterData> | undefined,
+  theaterList: { slug: string }[],
+  formatList: { tag: string }[]
 ): { theaterSlug: string; formatTag: string } | null {
   if (!theaters) return null;
-  // Priority: IMAX 70mm > Dolby > IMAX, then alphabetical by theater
-  for (const format of FORMAT_LIST) {
-    for (const theater of THEATER_LIST) {
+  for (const format of formatList) {
+    for (const theater of theaterList) {
       const t = theaters[theater.slug];
       if (!t) continue;
       const f = t.formats[format.tag];
@@ -89,139 +117,56 @@ function findBestAvailable(
 }
 
 /* =========================================================================
-   Countdown Timer
+   URL + localStorage persistence
    ========================================================================= */
-function Countdown() {
-  const targetDate = new Date("2026-04-03T00:00:00-04:00").getTime();
+function readUrlParams(): {
+  theaters: string[] | null;
+  movie: string | null;
+  dates: string[] | null;
+} {
+  if (typeof window === "undefined") return { theaters: null, movie: null, dates: null };
+  const params = new URLSearchParams(window.location.search);
+  const t = params.get("theaters");
+  const m = params.get("movie");
+  const d = params.get("dates");
+  return {
+    theaters: t ? t.split(",").filter(Boolean) : null,
+    movie: m || null,
+    dates: d ? d.split(",").filter(Boolean) : null,
+  };
+}
 
-  const calcTimeLeft = useCallback(() => {
-    const diff = targetDate - Date.now();
-    if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
-    return {
-      days: Math.floor(diff / (1000 * 60 * 60 * 24)),
-      hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
-      minutes: Math.floor((diff / (1000 * 60)) % 60),
-      seconds: Math.floor((diff / 1000) % 60),
-    };
-  }, [targetDate]);
+function writeUrlParams(theaters: string[], movie: string, dates: string[]) {
+  if (typeof window === "undefined") return;
+  const params = new URLSearchParams();
+  params.set("theaters", theaters.join(","));
+  params.set("movie", movie);
+  params.set("dates", dates.join(","));
+  const url = `${window.location.pathname}?${params.toString()}`;
+  window.history.replaceState({}, "", url);
+}
 
-  const [timeLeft, setTimeLeft] = useState(calcTimeLeft);
-  const [mounted, setMounted] = useState(false);
+const LS_KEY = "amc-alerts-selection";
 
-  useEffect(() => {
-    setMounted(true);
-    const timer = setInterval(() => setTimeLeft(calcTimeLeft()), 1000);
-    return () => clearInterval(timer);
-  }, [calcTimeLeft]);
-
-  if (!mounted) {
-    return (
-      <div className="hero-enter hero-enter-delay-3" style={{ marginTop: "var(--space-lg)" }}>
-        <div style={{ display: "flex", justifyContent: "center", gap: "var(--space-lg)" }}>
-          {["Days", "Hrs", "Min", "Sec"].map((label) => (
-            <div key={label} style={{ textAlign: "center" }}>
-              <div
-                className="skeleton"
-                style={{ width: 56, height: 48, borderRadius: 8, marginBottom: 4 }}
-              />
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
-                {label}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+function readLocalStorage(): {
+  theaters?: string[];
+  movie?: string;
+  dates?: string[];
+} | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
   }
+}
 
-  const units = [
-    { value: timeLeft.days, label: "Days" },
-    { value: timeLeft.hours, label: "Hrs" },
-    { value: timeLeft.minutes, label: "Min" },
-    { value: timeLeft.seconds, label: "Sec" },
-  ];
-
-  const isReleased =
-    timeLeft.days === 0 &&
-    timeLeft.hours === 0 &&
-    timeLeft.minutes === 0 &&
-    timeLeft.seconds === 0;
-
-  if (isReleased) {
-    return (
-      <div
-        className="hero-enter hero-enter-delay-3"
-        style={{
-          marginTop: "var(--space-lg)",
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "var(--space-sm)",
-          background: "var(--success-subtle)",
-          padding: "var(--space-sm) var(--space-base)",
-          borderRadius: 100,
-          fontSize: "var(--text-sm)",
-          fontWeight: 700,
-          color: "var(--success)",
-        }}
-      >
-        <span
-          className="pulse-dot"
-          style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success)" }}
-        />
-        Now in theatres
-      </div>
-    );
-  }
-
-  return (
-    <div className="hero-enter hero-enter-delay-3" style={{ marginTop: "var(--space-lg)" }}>
-      <div
-        style={{
-          fontSize: "var(--text-xs)",
-          color: "var(--text-tertiary)",
-          letterSpacing: "1.5px",
-          fontWeight: 600,
-          textTransform: "uppercase",
-          marginBottom: "var(--space-sm)",
-        }}
-      >
-        Release date countdown
-      </div>
-      <div style={{ display: "flex", justifyContent: "center", gap: "var(--space-lg)" }}>
-        {units.map(({ value, label }) => (
-          <div key={label} style={{ textAlign: "center" }}>
-            <div
-              style={{
-                fontSize: "var(--text-2xl)",
-                fontWeight: 800,
-                lineHeight: 1,
-                fontVariantNumeric: "tabular-nums",
-                color: "var(--text-primary)",
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border-subtle)",
-                borderRadius: 8,
-                padding: "var(--space-md) var(--space-base)",
-                minWidth: 56,
-              }}
-            >
-              {String(value).padStart(2, "0")}
-            </div>
-            <span
-              style={{
-                fontSize: "var(--text-xs)",
-                color: "var(--text-tertiary)",
-                fontWeight: 500,
-                marginTop: 4,
-                display: "block",
-              }}
-            >
-              {label}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+function writeLocalStorage(theaters: string[], movie: string, dates: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({ theaters, movie, dates }));
+  } catch { /* ignore */ }
 }
 
 /* =========================================================================
@@ -254,7 +199,7 @@ function ThemeToggle() {
       aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
       title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
     >
-      {theme === "dark" ? "☀" : "☾"}
+      {theme === "dark" ? "\u2600" : "\u263E"}
     </button>
   );
 }
@@ -315,17 +260,14 @@ function DateCard({
   date,
   result,
   index,
-  onNotify,
 }: {
   date: string;
   result?: DateResult;
   index: number;
-  onNotify: (date: string) => void;
 }) {
   const { weekday, date: dateLabel } = formatDateNice(date);
   const isLoading = !result;
   const hasShowtimes = result?.available && result.showtimes.length > 0;
-  const isReleaseDate = date === "2026-04-03";
 
   return (
     <div
@@ -341,19 +283,6 @@ function DateCard({
         } as React.CSSProperties
       }
     >
-      {isReleaseDate && (
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 2,
-            background: "var(--accent)",
-          }}
-        />
-      )}
-
       <div
         style={{
           display: "flex",
@@ -384,19 +313,6 @@ function DateCard({
             }}
           >
             {dateLabel}
-            {isReleaseDate && (
-              <span
-                style={{
-                  fontSize: "var(--text-xs)",
-                  fontWeight: 600,
-                  color: "var(--accent)",
-                  marginLeft: "var(--space-sm)",
-                  verticalAlign: "middle",
-                }}
-              >
-                Release day
-              </span>
-            )}
           </div>
         </div>
 
@@ -507,19 +423,11 @@ function DateCard({
           <div
             style={{
               fontSize: "var(--text-sm)",
-              marginBottom: "var(--space-md)",
               lineHeight: "var(--leading-normal)",
             }}
           >
             No tickets yet for this format
           </div>
-          <button
-            onClick={() => onNotify(date)}
-            className="btn-ghost"
-            style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
-          >
-            Notify me when available
-          </button>
         </div>
       )}
     </div>
@@ -533,11 +441,13 @@ function TheaterTabs({
   selected,
   onChange,
   theaters,
+  theaterList,
   bestCombo,
 }: {
   selected: string;
   onChange: (slug: string) => void;
   theaters: Record<string, TheaterData> | undefined;
+  theaterList: { slug: string; name: string; neighborhood: string }[];
   bestCombo: { theaterSlug: string; formatTag: string } | null;
 }) {
   return (
@@ -551,7 +461,7 @@ function TheaterTabs({
       role="tablist"
       aria-label="Theater selector"
     >
-      {THEATER_LIST.map((theater) => {
+      {theaterList.map((theater) => {
         const isSelected = selected === theater.slug;
         const hasAny = theaters?.[theater.slug]
           ? Object.values(theaters[theater.slug].formats).some((f) =>
@@ -584,15 +494,17 @@ function TheaterTabs({
             }}
           >
             {theater.name}
-            <span
-              style={{
-                fontSize: "var(--text-xs)",
-                color: "var(--text-tertiary)",
-                fontWeight: 400,
-              }}
-            >
-              {theater.neighborhood}
-            </span>
+            {theater.neighborhood && (
+              <span
+                style={{
+                  fontSize: "var(--text-xs)",
+                  color: "var(--text-tertiary)",
+                  fontWeight: 400,
+                }}
+              >
+                {theater.neighborhood}
+              </span>
+            )}
             {isBest && hasAny && (
               <span
                 style={{
@@ -719,28 +631,677 @@ function FormatPills({
 }
 
 /* =========================================================================
+   SETUP FLOW — Step 1: Market + Theater Selection
+   ========================================================================= */
+function TheaterSetup({
+  selectedTheaters,
+  onSelect,
+  onNext,
+}: {
+  selectedTheaters: string[];
+  onSelect: (theaters: string[]) => void;
+  onNext: () => void;
+}) {
+  const [markets, setMarkets] = useState<MarketInfo[]>([]);
+  const [selectedMarket, setSelectedMarket] = useState<string>("");
+  const [theaterOptions, setTheaterOptions] = useState<TheaterInfo[]>([]);
+  const [customSlug, setCustomSlug] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/theaters")
+      .then((r) => r.json())
+      .then((data: { markets: MarketInfo[] }) => {
+        setMarkets(data.markets || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedMarket) {
+      setTheaterOptions([]);
+      return;
+    }
+    fetch(`/api/theaters?market=${selectedMarket}`)
+      .then((r) => r.json())
+      .then((data: { theaters: TheaterInfo[] }) => {
+        setTheaterOptions(data.theaters || []);
+      })
+      .catch(() => setTheaterOptions([]));
+  }, [selectedMarket]);
+
+  const toggleTheater = (slug: string) => {
+    if (selectedTheaters.includes(slug)) {
+      onSelect(selectedTheaters.filter((s) => s !== slug));
+    } else {
+      onSelect([...selectedTheaters, slug]);
+    }
+  };
+
+  const addCustom = () => {
+    const slug = customSlug.trim().toLowerCase().replace(/\s+/g, "-");
+    if (slug && !selectedTheaters.includes(slug)) {
+      onSelect([...selectedTheaters, slug]);
+      setCustomSlug("");
+    }
+  };
+
+  return (
+    <div data-testid="theater-setup">
+      <h2
+        style={{
+          margin: "0 0 var(--space-sm)",
+          fontSize: "var(--text-xl)",
+          fontWeight: 800,
+          color: "var(--text-primary)",
+        }}
+      >
+        Select Theaters
+      </h2>
+      <p
+        style={{
+          color: "var(--text-secondary)",
+          fontSize: "var(--text-sm)",
+          margin: "0 0 var(--space-lg)",
+        }}
+      >
+        Choose a market, then pick the theaters you want to track.
+      </p>
+
+      {/* Market selector */}
+      <div style={{ marginBottom: "var(--space-lg)" }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: "var(--text-xs)",
+            fontWeight: 600,
+            color: "var(--text-secondary)",
+            marginBottom: "var(--space-xs)",
+            textTransform: "uppercase",
+            letterSpacing: "0.5px",
+          }}
+        >
+          Market
+        </label>
+        {loading ? (
+          <div className="skeleton" style={{ height: 44, width: "100%" }} />
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-sm)" }}>
+            {markets.map((m) => (
+              <button
+                key={m.slug}
+                data-testid={`market-${m.slug}`}
+                onClick={() => setSelectedMarket(m.slug)}
+                style={{
+                  padding: "var(--space-sm) var(--space-base)",
+                  borderRadius: 8,
+                  border: `1.5px solid ${selectedMarket === m.slug ? "var(--accent)" : "var(--border-subtle)"}`,
+                  background: selectedMarket === m.slug ? "var(--bg-elevated)" : "transparent",
+                  color: selectedMarket === m.slug ? "var(--text-primary)" : "var(--text-secondary)",
+                  fontFamily: "inherit",
+                  fontSize: "var(--text-sm)",
+                  fontWeight: selectedMarket === m.slug ? 700 : 500,
+                  cursor: "pointer",
+                  transition: "all var(--dur-fast) var(--ease-default)",
+                }}
+              >
+                {m.name}, {m.state}
+                <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginLeft: 6 }}>
+                  {m.theaterCount}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Theater options */}
+      {theaterOptions.length > 0 && (
+        <div style={{ marginBottom: "var(--space-lg)" }} data-testid="theater-options">
+          <label
+            style={{
+              display: "block",
+              fontSize: "var(--text-xs)",
+              fontWeight: 600,
+              color: "var(--text-secondary)",
+              marginBottom: "var(--space-sm)",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+            }}
+          >
+            Theaters in {markets.find((m) => m.slug === selectedMarket)?.name}
+          </label>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
+            {theaterOptions.map((t) => {
+              const isSelected = selectedTheaters.includes(t.slug);
+              return (
+                <button
+                  key={t.slug}
+                  data-testid={`theater-${t.slug}`}
+                  onClick={() => toggleTheater(t.slug)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "var(--space-md) var(--space-base)",
+                    borderRadius: 8,
+                    border: `1.5px solid ${isSelected ? "var(--accent)" : "var(--border-subtle)"}`,
+                    background: isSelected ? "var(--accent-subtle)" : "var(--bg-surface)",
+                    color: "var(--text-primary)",
+                    fontFamily: "inherit",
+                    fontSize: "var(--text-sm)",
+                    cursor: "pointer",
+                    transition: "all var(--dur-fast) var(--ease-default)",
+                    textAlign: "left",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700 }}>{t.name}</div>
+                    <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginTop: 2 }}>
+                      {t.neighborhood}
+                      {t.hasImax70mm && (
+                        <span style={{ color: "var(--accent)", marginLeft: 8, fontWeight: 700 }}>
+                          IMAX 70mm
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: 4,
+                      border: `2px solid ${isSelected ? "var(--accent)" : "var(--border-default)"}`,
+                      background: isSelected ? "var(--accent)" : "transparent",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "white",
+                      fontSize: 14,
+                      fontWeight: 800,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {isSelected ? "\u2713" : ""}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Custom slug input */}
+      <div style={{ marginBottom: "var(--space-lg)" }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: "var(--text-xs)",
+            fontWeight: 600,
+            color: "var(--text-secondary)",
+            marginBottom: "var(--space-xs)",
+            textTransform: "uppercase",
+            letterSpacing: "0.5px",
+          }}
+        >
+          Or add a custom AMC theater slug
+        </label>
+        <div style={{ display: "flex", gap: "var(--space-sm)" }}>
+          <input
+            type="text"
+            value={customSlug}
+            onChange={(e) => setCustomSlug(e.target.value)}
+            placeholder="e.g. amc-metreon-16"
+            onKeyDown={(e) => e.key === "Enter" && addCustom()}
+            style={{ flex: 1 }}
+          />
+          <button className="btn-ghost" onClick={addCustom} type="button">
+            Add
+          </button>
+        </div>
+      </div>
+
+      {/* Selected theaters */}
+      {selectedTheaters.length > 0 && (
+        <div style={{ marginBottom: "var(--space-lg)" }}>
+          <div
+            style={{
+              fontSize: "var(--text-xs)",
+              fontWeight: 600,
+              color: "var(--text-secondary)",
+              marginBottom: "var(--space-sm)",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+            }}
+          >
+            Selected ({selectedTheaters.length})
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-sm)" }}>
+            {selectedTheaters.map((slug) => (
+              <span
+                key={slug}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  background: "var(--accent-subtle)",
+                  border: "1px solid var(--accent)",
+                  borderRadius: 6,
+                  padding: "4px 10px",
+                  fontSize: "var(--text-xs)",
+                  fontWeight: 600,
+                  color: "var(--text-primary)",
+                }}
+              >
+                {slug}
+                <button
+                  onClick={() => onSelect(selectedTheaters.filter((s) => s !== slug))}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--text-tertiary)",
+                    cursor: "pointer",
+                    padding: 0,
+                    fontSize: 16,
+                    lineHeight: 1,
+                  }}
+                >
+                  &times;
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <button
+        className="btn-primary"
+        disabled={selectedTheaters.length === 0}
+        onClick={onNext}
+        data-testid="theater-next"
+      >
+        Next: Select Movie
+      </button>
+    </div>
+  );
+}
+
+/* =========================================================================
+   SETUP FLOW — Step 2: Movie Selection
+   ========================================================================= */
+function MovieSetup({
+  theaters,
+  selectedMovie,
+  onSelect,
+  onNext,
+  onBack,
+}: {
+  theaters: string[];
+  selectedMovie: string;
+  onSelect: (slug: string, title: string) => void;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const [movies, setMovies] = useState<MovieInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (theaters.length === 0) return;
+    setLoading(true);
+    const today = toDateStr(new Date());
+    fetch(`/api/movies?theater=${theaters[0]}&date=${today}`)
+      .then((r) => r.json())
+      .then((data: { movies: MovieInfo[] }) => {
+        setMovies(data.movies || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [theaters]);
+
+  const formatLabels: Record<string, string> = {
+    imax70mm: "IMAX 70mm",
+    dolbycinema: "Dolby Cinema",
+    imax: "IMAX",
+    standard: "Standard",
+  };
+
+  return (
+    <div data-testid="movie-setup">
+      <h2
+        style={{
+          margin: "0 0 var(--space-sm)",
+          fontSize: "var(--text-xl)",
+          fontWeight: 800,
+          color: "var(--text-primary)",
+        }}
+      >
+        Select a Movie
+      </h2>
+      <p
+        style={{
+          color: "var(--text-secondary)",
+          fontSize: "var(--text-sm)",
+          margin: "0 0 var(--space-lg)",
+        }}
+      >
+        Choose the movie you want to track showtimes for.
+      </p>
+
+      {loading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="skeleton" style={{ height: 64, animationDelay: `${i * 100}ms` }} />
+          ))}
+        </div>
+      ) : movies.length === 0 ? (
+        <div
+          className="card"
+          style={{
+            padding: "var(--space-2xl)",
+            textAlign: "center",
+            color: "var(--text-tertiary)",
+          }}
+        >
+          <p style={{ margin: "0 0 var(--space-md)", fontSize: "var(--text-sm)" }}>
+            No movies found at this theater for today. Try a different date or theater.
+          </p>
+        </div>
+      ) : (
+        <div
+          style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginBottom: "var(--space-lg)" }}
+          data-testid="movie-list"
+        >
+          {movies.map((m) => {
+            const isSelected = selectedMovie === m.slug;
+            return (
+              <button
+                key={m.slug}
+                data-testid={`movie-${m.slug}`}
+                onClick={() => onSelect(m.slug, m.title)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "var(--space-md) var(--space-base)",
+                  borderRadius: 8,
+                  border: `1.5px solid ${isSelected ? "var(--accent)" : "var(--border-subtle)"}`,
+                  background: isSelected ? "var(--accent-subtle)" : "var(--bg-surface)",
+                  color: "var(--text-primary)",
+                  fontFamily: "inherit",
+                  fontSize: "var(--text-sm)",
+                  cursor: "pointer",
+                  transition: "all var(--dur-fast) var(--ease-default)",
+                  textAlign: "left",
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700 }}>{m.title}</div>
+                  <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+                    {m.formats.map((f) => (
+                      <span
+                        key={f}
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: "1px 6px",
+                          borderRadius: 3,
+                          background: f === "imax70mm" ? "var(--accent)" : "var(--bg-elevated)",
+                          color: f === "imax70mm" ? "oklch(98% 0.005 75)" : "var(--text-tertiary)",
+                          letterSpacing: "0.5px",
+                        }}
+                      >
+                        {formatLabels[f] || f}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {isSelected && (
+                  <span style={{ color: "var(--accent)", fontSize: 20, fontWeight: 800 }}>{"\u2713"}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: "var(--space-md)" }}>
+        <button className="btn-ghost" onClick={onBack}>
+          Back
+        </button>
+        <button
+          className="btn-primary"
+          disabled={!selectedMovie}
+          onClick={onNext}
+          data-testid="movie-next"
+        >
+          Next: Select Dates
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   SETUP FLOW — Step 3: Date Selection
+   ========================================================================= */
+function DateSetup({
+  dates,
+  onSelect,
+  onNext,
+  onBack,
+}: {
+  dates: string[];
+  onSelect: (dates: string[]) => void;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const defaults = getDefaultDates();
+  const [startDate, setStartDate] = useState(dates[0] || defaults.start);
+  const [endDate, setEndDate] = useState(dates[dates.length - 1] || defaults.end);
+
+  const quickPicks = useMemo(() => {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+
+    const daysToFri = (5 - dayOfWeek + 7) % 7 || 7;
+    const fri = new Date(today);
+    fri.setDate(today.getDate() + (dayOfWeek <= 5 ? daysToFri : 0));
+    if (dayOfWeek >= 5) fri.setDate(today.getDate());
+    const sun = new Date(fri);
+    sun.setDate(fri.getDate() + (dayOfWeek === 0 ? 0 : 7 - fri.getDay()));
+
+    const nextMon = new Date(today);
+    nextMon.setDate(today.getDate() + ((8 - dayOfWeek) % 7 || 7));
+    const nextSun = new Date(nextMon);
+    nextSun.setDate(nextMon.getDate() + 6);
+
+    const twoWeeks = new Date(today);
+    twoWeeks.setDate(today.getDate() + 13);
+
+    return [
+      { label: "Next 7 days", start: toDateStr(today), end: toDateStr(new Date(today.getTime() + 6 * 86400000)) },
+      { label: "This weekend", start: toDateStr(fri), end: toDateStr(sun) },
+      { label: "Next week", start: toDateStr(nextMon), end: toDateStr(nextSun) },
+      { label: "Next 2 weeks", start: toDateStr(today), end: toDateStr(twoWeeks) },
+    ];
+  }, []);
+
+  const applyQuick = (start: string, end: string) => {
+    setStartDate(start);
+    setEndDate(end);
+    onSelect(generateDateRange(start, end));
+  };
+
+  useEffect(() => {
+    if (startDate && endDate && startDate <= endDate) {
+      onSelect(generateDateRange(startDate, endDate));
+    }
+  }, [startDate, endDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div data-testid="date-setup">
+      <h2
+        style={{
+          margin: "0 0 var(--space-sm)",
+          fontSize: "var(--text-xl)",
+          fontWeight: 800,
+          color: "var(--text-primary)",
+        }}
+      >
+        Select Date Range
+      </h2>
+      <p
+        style={{
+          color: "var(--text-secondary)",
+          fontSize: "var(--text-sm)",
+          margin: "0 0 var(--space-lg)",
+        }}
+      >
+        Choose the dates you want to check for showtimes.
+      </p>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-sm)", marginBottom: "var(--space-lg)" }}>
+        {quickPicks.map((qp) => (
+          <button
+            key={qp.label}
+            className="btn-ghost"
+            data-testid={`quick-${qp.label.toLowerCase().replace(/\s+/g, "-")}`}
+            onClick={() => applyQuick(qp.start, qp.end)}
+            style={{
+              borderColor:
+                startDate === qp.start && endDate === qp.end ? "var(--accent)" : undefined,
+              color:
+                startDate === qp.start && endDate === qp.end ? "var(--accent)" : undefined,
+            }}
+          >
+            {qp.label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: "var(--space-md)", marginBottom: "var(--space-lg)", flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <label
+            style={{
+              display: "block",
+              fontSize: "var(--text-xs)",
+              fontWeight: 600,
+              color: "var(--text-secondary)",
+              marginBottom: "var(--space-xs)",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+            }}
+          >
+            Start date
+          </label>
+          <input
+            type="text"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            placeholder="YYYY-MM-DD"
+            data-testid="start-date"
+          />
+        </div>
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <label
+            style={{
+              display: "block",
+              fontSize: "var(--text-xs)",
+              fontWeight: 600,
+              color: "var(--text-secondary)",
+              marginBottom: "var(--space-xs)",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+            }}
+          >
+            End date
+          </label>
+          <input
+            type="text"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            placeholder="YYYY-MM-DD"
+            data-testid="end-date"
+          />
+        </div>
+      </div>
+
+      {dates.length > 0 && (
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-tertiary)", marginBottom: "var(--space-lg)" }}>
+          {dates.length} day{dates.length !== 1 ? "s" : ""} selected
+        </p>
+      )}
+
+      <div style={{ display: "flex", gap: "var(--space-md)" }}>
+        <button className="btn-ghost" onClick={onBack}>
+          Back
+        </button>
+        <button
+          className="btn-primary"
+          disabled={dates.length === 0}
+          onClick={onNext}
+          data-testid="date-next"
+        >
+          View Showtimes
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
    Main Page
    ========================================================================= */
 export default function Home() {
-  const [status, setStatus] = useState<MultiStatusResponse | null>(null);
-  const [loadingStatus, setLoadingStatus] = useState(true);
-  const [email, setEmail] = useState("");
-  const [selectedDates, setSelectedDates] = useState<string[]>([...TARGET_DATES]);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitResult, setSubmitResult] = useState<{
-    success: boolean;
-    message: string;
-  } | null>(null);
-  const [lastChecked, setLastChecked] = useState<string>("");
-  const [notifyDate, setNotifyDate] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
-  // Theater + format selection
-  const [selectedTheater, setSelectedTheater] = useState(THEATER_LIST[0].slug);
+  // Setup flow state
+  const [step, setStep] = useState<"setup-theaters" | "setup-movie" | "setup-dates" | "results">("setup-theaters");
+  const [selectedTheaters, setSelectedTheaters] = useState<string[]>([]);
+  const [selectedMovie, setSelectedMovie] = useState("");
+  const [movieTitle, setMovieTitle] = useState("");
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
+
+  // Results state
+  const [status, setStatus] = useState<MultiStatusResponse | null>(null);
+  const [loadingStatus, setLoadingStatus] = useState(false);
+  const [lastChecked, setLastChecked] = useState<string>("");
+  const [selectedTheater, setSelectedTheater] = useState("");
   const [selectedFormat, setSelectedFormat] = useState(FORMAT_LIST[0].tag);
 
+  // Initialize from URL params or localStorage
+  useEffect(() => {
+    setMounted(true);
+    const urlParams = readUrlParams();
+    const lsParams = readLocalStorage();
+
+    const theaters = urlParams.theaters || lsParams?.theaters;
+    const movie = urlParams.movie || lsParams?.movie;
+    const dates = urlParams.dates || lsParams?.dates;
+
+    if (theaters && theaters.length > 0 && movie) {
+      setSelectedTheaters(theaters);
+      setSelectedMovie(movie);
+      setMovieTitle(movie.replace(/-\d+$/, "").replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()));
+      setSelectedDates(dates || generateDateRange(getDefaultDates().start, getDefaultDates().end));
+      setSelectedTheater(theaters[0]);
+      setStep("results");
+    }
+  }, []);
+
+  // Fetch status when in results mode
   const fetchStatus = useCallback(async () => {
+    if (selectedTheaters.length === 0 || !selectedMovie || selectedDates.length === 0) return;
+
+    setLoadingStatus(true);
     try {
-      const resp = await fetch("/api/status");
+      const params = new URLSearchParams({
+        theaters: selectedTheaters.join(","),
+        movie: selectedMovie,
+        dates: selectedDates.join(","),
+      });
+      const resp = await fetch(`/api/status?${params}`);
       const data = (await resp.json()) as MultiStatusResponse;
       setStatus(data);
       const now = new Date();
@@ -752,19 +1313,41 @@ export default function Home() {
     } finally {
       setLoadingStatus(false);
     }
-  }, []);
+  }, [selectedTheaters, selectedMovie, selectedDates]);
 
   useEffect(() => {
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [fetchStatus]);
+    if (step === "results") {
+      fetchStatus();
+      const interval = setInterval(fetchStatus, 5 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [step, fetchStatus]);
 
-  const bestCombo = findBestAvailable(status?.theaters);
-
-  // Auto-select the best combo once data loads
+  // Persist selections
   useEffect(() => {
-    if (bestCombo) {
+    if (step === "results" && selectedTheaters.length > 0 && selectedMovie) {
+      writeUrlParams(selectedTheaters, selectedMovie, selectedDates);
+      writeLocalStorage(selectedTheaters, selectedMovie, selectedDates);
+    }
+  }, [step, selectedTheaters, selectedMovie, selectedDates]);
+
+  const theaterList = useMemo(
+    () =>
+      selectedTheaters.map((slug) => {
+        const data = status?.theaters[slug];
+        return {
+          slug,
+          name: data?.name || slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+          neighborhood: data?.neighborhood || "",
+        };
+      }),
+    [selectedTheaters, status]
+  );
+
+  const bestCombo = findBestAvailable(status?.theaters, theaterList, FORMAT_LIST);
+
+  useEffect(() => {
+    if (bestCombo && step === "results") {
       setSelectedTheater(bestCombo.theaterSlug);
       setSelectedFormat(bestCombo.formatTag);
     }
@@ -773,60 +1356,24 @@ export default function Home() {
   const currentTheaterData = status?.theaters[selectedTheater];
   const currentFormatData = currentTheaterData?.formats[selectedFormat];
 
-  const anyAvailable = status?.theaters
-    ? Object.values(status.theaters).some((t) =>
-        Object.values(t.formats).some((f) =>
-          Object.values(f.dates).some((d) => d.available)
-        )
-      )
-    : false;
-
-  const handleNotify = (date: string) => {
-    setNotifyDate(date);
-    if (!selectedDates.includes(date)) {
-      setSelectedDates([date]);
+  const startOver = () => {
+    setStep("setup-theaters");
+    setStatus(null);
+    if (typeof window !== "undefined") {
+      window.history.replaceState({}, "", window.location.pathname);
     }
-    document.getElementById("signup")?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const toggleDate = (date: string) => {
-    setSelectedDates((prev) =>
-      prev.includes(date) ? prev.filter((d) => d !== date) : [...prev, date]
+  if (!mounted) {
+    return (
+      <div style={{ minHeight: "100vh" }}>
+        <div className="film-strip-border" style={{ background: "var(--accent)" }} />
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "80vh" }}>
+          <div className="projector-spinner" />
+        </div>
+      </div>
     );
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || submitting) return;
-
-    setSubmitting(true);
-    setSubmitResult(null);
-
-    try {
-      const resp = await fetch("/api/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, dates: selectedDates }),
-      });
-      const data = (await resp.json()) as {
-        success: boolean;
-        message?: string;
-        error?: string;
-      };
-      setSubmitResult({
-        success: data.success || false,
-        message: data.message || data.error || "Something went wrong",
-      });
-      if (data.success) setEmail("");
-    } catch {
-      setSubmitResult({ success: false, message: "Network error — please try again." });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const theaterMeta = THEATER_LIST.find((t) => t.slug === selectedTheater);
-  const formatMeta = FORMAT_LIST.find((f) => f.tag === selectedFormat);
+  }
 
   return (
     <div style={{ minHeight: "100vh" }}>
@@ -839,7 +1386,7 @@ export default function Home() {
         className="film-grain light-leak"
         style={{
           background: `linear-gradient(180deg, var(--bg-base) 0%, var(--bg-surface) 40%, var(--bg-base) 100%)`,
-          padding: "var(--space-3xl) var(--space-lg) var(--space-2xl)",
+          padding: "var(--space-2xl) var(--space-lg) var(--space-xl)",
           textAlign: "center",
           position: "relative",
           overflow: "hidden",
@@ -852,7 +1399,7 @@ export default function Home() {
             left: "50%",
             transform: "translate(-50%, -50%)",
             width: "min(600px, 100vw)",
-            height: 500,
+            height: 400,
             borderRadius: "50%",
             background:
               "radial-gradient(circle, oklch(55% 0.24 27 / 0.06) 0%, transparent 70%)",
@@ -860,9 +1407,7 @@ export default function Home() {
           }}
         />
 
-        <div
-          style={{ position: "relative", zIndex: 2, maxWidth: 700, margin: "0 auto" }}
-        >
+        <div style={{ position: "relative", zIndex: 2, maxWidth: 700, margin: "0 auto" }}>
           <div
             className="hero-enter"
             style={{
@@ -872,7 +1417,7 @@ export default function Home() {
               background: "var(--accent)",
               padding: "5px 16px",
               borderRadius: 4,
-              marginBottom: "var(--space-lg)",
+              marginBottom: "var(--space-base)",
             }}
           >
             <span
@@ -883,51 +1428,14 @@ export default function Home() {
                 letterSpacing: "2.5px",
               }}
             >
-              NYC TICKET ALERTS
-            </span>
-          </div>
-
-          <div
-            className="hero-enter hero-enter-delay-1"
-            style={{
-              width: 130,
-              height: 195,
-              margin: "0 auto var(--space-lg)",
-              borderRadius: 8,
-              background: `linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-surface) 100%)`,
-              border: "1px solid var(--border-subtle)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "var(--space-sm)",
-              boxShadow: "var(--shadow-lg)",
-              overflow: "hidden",
-              position: "relative",
-            }}
-          >
-            <span style={{ fontSize: 36, position: "relative", zIndex: 1 }}>🚀</span>
-            <span
-              style={{
-                fontSize: 9,
-                color: "var(--text-tertiary)",
-                textAlign: "center",
-                padding: "0 var(--space-sm)",
-                letterSpacing: "1px",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                position: "relative",
-                zIndex: 1,
-              }}
-            >
-              Project Hail Mary
+              AMC SHOWTIME ALERTS
             </span>
           </div>
 
           <h1
-            className="hero-enter hero-enter-delay-2"
+            className="hero-enter hero-enter-delay-1"
             style={{
-              fontSize: "clamp(var(--text-2xl), 6vw, var(--text-4xl))",
+              fontSize: "clamp(var(--text-xl), 5vw, var(--text-3xl))",
               fontWeight: 800,
               margin: "0 0 var(--space-sm)",
               lineHeight: "var(--leading-tight)",
@@ -935,404 +1443,278 @@ export default function Home() {
               color: "var(--text-primary)",
             }}
           >
-            Project Hail Mary
+            {step === "results" && movieTitle
+              ? movieTitle
+              : "Track Any Movie at Any AMC Theater"}
           </h1>
 
           <p
             className="font-display hero-enter hero-enter-delay-2"
             style={{
-              fontSize: "var(--text-lg)",
+              fontSize: "var(--text-base)",
               color: "var(--text-secondary)",
-              margin: "0 0 var(--space-md)",
+              margin: 0,
               fontWeight: 400,
               fontStyle: "italic",
             }}
           >
-            Premium Format Showtimes · NYC
+            {step === "results"
+              ? `${selectedTheaters.length} theater${selectedTheaters.length !== 1 ? "s" : ""} \u00b7 ${selectedDates.length} date${selectedDates.length !== 1 ? "s" : ""}`
+              : "Search theaters, pick your movie, and check showtimes"}
           </p>
-
-          <Countdown />
-
-          {!loadingStatus && (
-            <div
-              className="hero-enter hero-enter-delay-4"
-              style={{
-                marginTop: "var(--space-lg)",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "var(--space-sm)",
-                background: anyAvailable ? "var(--success-subtle)" : "var(--bg-surface)",
-                border: "1px solid",
-                borderColor: anyAvailable ? "var(--success)" : "var(--border-subtle)",
-                borderRadius: 100,
-                padding: "var(--space-sm) var(--space-base)",
-                fontSize: "var(--text-sm)",
-                fontWeight: 600,
-                color: anyAvailable ? "var(--success)" : "var(--text-tertiary)",
-              }}
-            >
-              <span
-                className={anyAvailable ? "pulse-dot" : undefined}
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: anyAvailable ? "var(--success)" : "var(--text-tertiary)",
-                  flexShrink: 0,
-                }}
-              />
-              {anyAvailable ? "Tickets available now" : "Tickets not yet on sale"}
-            </div>
-          )}
         </div>
       </header>
 
       {/* ===== MAIN CONTENT ===== */}
       <main style={{ maxWidth: 960, margin: "0 auto", padding: "0 var(--space-lg)" }}>
-        <section style={{ padding: "var(--space-2xl) 0 var(--space-xl)" }}>
-          {/* Section header */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "var(--space-lg)",
-              gap: "var(--space-md)",
-              flexWrap: "wrap",
-            }}
+        {/* ===== SETUP FLOW ===== */}
+        {step !== "results" && (
+          <section
+            className="card"
+            style={{ padding: "var(--space-2xl)", margin: "var(--space-xl) 0" }}
+            data-testid="setup-flow"
           >
-            <div>
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: "var(--text-xl)",
-                  fontWeight: 800,
-                  color: "var(--text-primary)",
-                }}
-              >
-                April 1–5, 2026
-              </h2>
-              <p
-                style={{
-                  margin: "4px 0 0",
-                  color: "var(--text-secondary)",
-                  fontSize: "var(--text-sm)",
-                }}
-              >
-                {formatMeta?.label ?? selectedFormat} · {theaterMeta?.name ?? selectedTheater}
-              </p>
-            </div>
-            {lastChecked && (
-              <div
-                style={{
-                  color: "var(--text-tertiary)",
-                  fontSize: "var(--text-xs)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "var(--space-sm)",
-                }}
-              >
-                <span>Updated {lastChecked}</span>
-                <button
-                  onClick={fetchStatus}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "var(--accent)",
-                    cursor: "pointer",
-                    fontSize: "var(--text-xs)",
-                    padding: 0,
-                    fontWeight: 700,
-                    fontFamily: "inherit",
-                  }}
-                >
-                  Refresh
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Theater tabs */}
-          <TheaterTabs
-            selected={selectedTheater}
-            onChange={setSelectedTheater}
-            theaters={status?.theaters}
-            bestCombo={bestCombo}
-          />
-
-          {/* Format pills */}
-          <FormatPills
-            selected={selectedFormat}
-            onChange={setSelectedFormat}
-            theaterData={currentTheaterData}
-            bestCombo={bestCombo}
-            theaterSlug={selectedTheater}
-          />
-
-          {/* Loading spinner */}
-          {loadingStatus && !status && (
+            {/* Step indicators */}
             <div
               style={{
                 display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                padding: "var(--space-3xl) 0",
-                gap: "var(--space-base)",
+                gap: "var(--space-md)",
+                marginBottom: "var(--space-xl)",
               }}
             >
-              <div className="projector-spinner" />
-              <p
-                style={{
-                  color: "var(--text-tertiary)",
-                  fontSize: "var(--text-sm)",
-                  margin: 0,
-                }}
-              >
-                Checking showtimes&hellip;
-              </p>
-            </div>
-          )}
+              {[
+                { key: "setup-theaters", label: "Theaters", num: 1 },
+                { key: "setup-movie", label: "Movie", num: 2 },
+                { key: "setup-dates", label: "Dates", num: 3 },
+              ].map((s) => {
+                const steps = ["setup-theaters", "setup-movie", "setup-dates"];
+                const currentIdx = steps.indexOf(step);
+                const thisIdx = steps.indexOf(s.key);
+                const isActive = step === s.key;
+                const isDone = thisIdx < currentIdx;
 
-          {/* Date cards grid */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-              gap: "var(--space-base)",
-            }}
-          >
-            {TARGET_DATES.map((date, i) => (
-              <DateCard
-                key={`${selectedTheater}-${selectedFormat}-${date}`}
-                date={date}
-                result={currentFormatData?.dates[date]}
-                index={i}
-                onNotify={handleNotify}
+                return (
+                  <div
+                    key={s.key}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      opacity: isActive ? 1 : isDone ? 0.8 : 0.4,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: "50%",
+                        background: isActive ? "var(--accent)" : isDone ? "var(--success)" : "var(--bg-elevated)",
+                        color: isActive || isDone ? "white" : "var(--text-tertiary)",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 12,
+                        fontWeight: 800,
+                      }}
+                    >
+                      {isDone ? "\u2713" : s.num}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "var(--text-xs)",
+                        fontWeight: 700,
+                        color: isActive ? "var(--text-primary)" : "var(--text-tertiary)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                      }}
+                    >
+                      {s.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {step === "setup-theaters" && (
+              <TheaterSetup
+                selectedTheaters={selectedTheaters}
+                onSelect={setSelectedTheaters}
+                onNext={() => setStep("setup-movie")}
               />
-            ))}
-          </div>
-        </section>
+            )}
 
-        {/* ===== EMAIL SIGNUP ===== */}
-        <section
-          id="signup"
-          className="card card-enter"
-          style={
-            {
-              "--i": 5,
-              padding: "var(--space-2xl)",
-              marginBottom: "var(--space-2xl)",
-            } as React.CSSProperties
-          }
-        >
-          {submitResult?.success ? (
-            <div style={{ textAlign: "center", padding: "var(--space-lg) 0" }}>
-              <div
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: "50%",
-                  background: "var(--success-subtle)",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: "var(--space-base)",
-                  fontSize: 28,
+            {step === "setup-movie" && (
+              <MovieSetup
+                theaters={selectedTheaters}
+                selectedMovie={selectedMovie}
+                onSelect={(slug, title) => {
+                  setSelectedMovie(slug);
+                  setMovieTitle(title);
                 }}
-              >
-                ✓
-              </div>
-              <h2
-                style={{
-                  margin: "0 0 var(--space-sm)",
-                  fontSize: "var(--text-xl)",
-                  fontWeight: 800,
-                  color: "var(--text-primary)",
+                onNext={() => {
+                  if (selectedDates.length === 0) {
+                    const d = getDefaultDates();
+                    setSelectedDates(generateDateRange(d.start, d.end));
+                  }
+                  setStep("setup-dates");
                 }}
-              >
-                You&apos;re on the list
-              </h2>
-              <p
-                style={{
-                  color: "var(--text-secondary)",
-                  margin: "0 0 var(--space-lg)",
-                  fontSize: "var(--text-sm)",
-                  maxWidth: "45ch",
-                  marginLeft: "auto",
-                  marginRight: "auto",
-                  lineHeight: "var(--leading-normal)",
+                onBack={() => setStep("setup-theaters")}
+              />
+            )}
+
+            {step === "setup-dates" && (
+              <DateSetup
+                dates={selectedDates}
+                onSelect={setSelectedDates}
+                onNext={() => {
+                  setSelectedTheater(selectedTheaters[0]);
+                  setStep("results");
                 }}
-              >
-                We&apos;ll email you the moment tickets drop.
-                No spam — just one alert when tickets become available.
-              </p>
-              <button onClick={() => setSubmitResult(null)} className="btn-ghost">
-                Add another email
-              </button>
-            </div>
-          ) : (
-            <>
-              <div style={{ marginBottom: "var(--space-lg)" }}>
+                onBack={() => setStep("setup-movie")}
+              />
+            )}
+          </section>
+        )}
+
+        {/* ===== RESULTS VIEW ===== */}
+        {step === "results" && (
+          <section style={{ padding: "var(--space-xl) 0" }} data-testid="results-view">
+            {/* Section header */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "var(--space-lg)",
+                gap: "var(--space-md)",
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
                 <h2
                   style={{
-                    margin: "0 0 var(--space-sm)",
+                    margin: 0,
                     fontSize: "var(--text-xl)",
                     fontWeight: 800,
                     color: "var(--text-primary)",
                   }}
                 >
-                  Get notified
+                  {movieTitle || selectedMovie}
                 </h2>
                 <p
                   style={{
+                    margin: "4px 0 0",
                     color: "var(--text-secondary)",
-                    margin: 0,
                     fontSize: "var(--text-sm)",
-                    maxWidth: "55ch",
-                    lineHeight: "var(--leading-normal)",
                   }}
                 >
-                  Enter your email and we&apos;ll alert you the instant tickets go on sale.
-                  {notifyDate && (
-                    <span style={{ color: "var(--accent)" }}>
-                      {" "}
-                      Pre-selected: {formatDateNice(notifyDate).weekday}{" "}
-                      {formatDateNice(notifyDate).date}
-                    </span>
-                  )}
+                  {FORMAT_LIST.find((f) => f.tag === selectedFormat)?.label ?? selectedFormat}
+                  {" \u00b7 "}
+                  {theaterList.find((t) => t.slug === selectedTheater)?.name ?? selectedTheater}
                 </p>
               </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-md)" }}>
+                {lastChecked && (
+                  <div
+                    style={{
+                      color: "var(--text-tertiary)",
+                      fontSize: "var(--text-xs)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "var(--space-sm)",
+                    }}
+                  >
+                    <span>Updated {lastChecked}</span>
+                    <button
+                      onClick={fetchStatus}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--accent)",
+                        cursor: "pointer",
+                        fontSize: "var(--text-xs)",
+                        padding: 0,
+                        fontWeight: 700,
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                )}
+                <button
+                  className="btn-ghost"
+                  onClick={startOver}
+                  data-testid="change-selection"
+                  style={{ fontSize: "var(--text-xs)" }}
+                >
+                  Change selection
+                </button>
+              </div>
+            </div>
 
-              <form onSubmit={handleSubmit}>
-                <div
+            {/* Theater tabs */}
+            <TheaterTabs
+              selected={selectedTheater}
+              onChange={setSelectedTheater}
+              theaters={status?.theaters}
+              theaterList={theaterList}
+              bestCombo={bestCombo}
+            />
+
+            {/* Format pills */}
+            <FormatPills
+              selected={selectedFormat}
+              onChange={setSelectedFormat}
+              theaterData={currentTheaterData}
+              bestCombo={bestCombo}
+              theaterSlug={selectedTheater}
+            />
+
+            {/* Loading spinner */}
+            {loadingStatus && !status && (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  padding: "var(--space-3xl) 0",
+                  gap: "var(--space-base)",
+                }}
+              >
+                <div className="projector-spinner" />
+                <p
                   style={{
-                    display: "flex",
-                    gap: "var(--space-md)",
-                    marginBottom: "var(--space-lg)",
-                    flexWrap: "wrap",
+                    color: "var(--text-tertiary)",
+                    fontSize: "var(--text-sm)",
+                    margin: 0,
                   }}
                 >
-                  <div style={{ flex: 1, minWidth: 240 }}>
-                    <label
-                      htmlFor="email-input"
-                      style={{
-                        display: "block",
-                        fontSize: "var(--text-xs)",
-                        fontWeight: 600,
-                        color: "var(--text-secondary)",
-                        marginBottom: "var(--space-xs)",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                      }}
-                    >
-                      Email address
-                    </label>
-                    <input
-                      id="email-input"
-                      type="email"
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      disabled={submitting}
-                      autoComplete="email"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="btn-red"
-                    disabled={submitting || !email}
-                    style={{ alignSelf: "flex-end" }}
-                  >
-                    {submitting ? "Subscribing\u2026" : "Notify me"}
-                  </button>
-                </div>
+                  Checking showtimes&hellip;
+                </p>
+              </div>
+            )}
 
-                <fieldset style={{ border: "none", margin: 0, padding: 0 }}>
-                  <legend
-                    style={{
-                      fontSize: "var(--text-xs)",
-                      color: "var(--text-tertiary)",
-                      marginBottom: "var(--space-sm)",
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                    }}
-                  >
-                    Notify me for
-                  </legend>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-sm)" }}>
-                    <label
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        cursor: "pointer",
-                        fontSize: "var(--text-sm)",
-                        color: "var(--text-secondary)",
-                        padding: "var(--space-xs) var(--space-sm)",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedDates.length === TARGET_DATES.length}
-                        onChange={(e) => {
-                          setSelectedDates(e.target.checked ? [...TARGET_DATES] : []);
-                        }}
-                      />
-                      All dates
-                    </label>
-                    {TARGET_DATES.map((date) => {
-                      const { weekday, date: dLabel } = formatDateNice(date);
-                      const isSelected = selectedDates.includes(date);
-                      return (
-                        <label
-                          key={date}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                            cursor: "pointer",
-                            fontSize: "var(--text-sm)",
-                            color: isSelected ? "var(--text-primary)" : "var(--text-secondary)",
-                            background: isSelected ? "var(--bg-elevated)" : "transparent",
-                            padding: "var(--space-xs) var(--space-sm)",
-                            borderRadius: 4,
-                            border: `1px solid ${
-                              isSelected ? "var(--border-default)" : "transparent"
-                            }`,
-                            transition: `all var(--dur-fast) var(--ease-default)`,
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleDate(date)}
-                          />
-                          {weekday.slice(0, 3)} {dLabel}
-                        </label>
-                      );
-                    })}
-                  </div>
-                </fieldset>
-
-                {submitResult && !submitResult.success && (
-                  <p
-                    role="alert"
-                    style={{
-                      color: "var(--error)",
-                      fontSize: "var(--text-sm)",
-                      marginTop: "var(--space-md)",
-                      margin: "var(--space-md) 0 0",
-                    }}
-                  >
-                    {submitResult.message}
-                  </p>
-                )}
-              </form>
-            </>
-          )}
-        </section>
+            {/* Date cards grid */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                gap: "var(--space-base)",
+              }}
+              data-testid="showtime-grid"
+            >
+              {selectedDates.map((date, i) => (
+                <DateCard
+                  key={`${selectedTheater}-${selectedFormat}-${date}`}
+                  date={date}
+                  result={currentFormatData?.dates[date]}
+                  index={i}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ===== FOOTER ===== */}
         <footer
@@ -1372,8 +1754,8 @@ export default function Home() {
                   maxWidth: "40ch",
                 }}
               >
-                We check AMC&apos;s website every 15 minutes across 3 theaters and 3 formats.
-                When tickets appear, we email you with direct booking links.
+                Select your theaters and movie, then we check AMC&apos;s website for
+                available showtimes across multiple formats.
               </p>
             </div>
 
@@ -1388,7 +1770,7 @@ export default function Home() {
                   letterSpacing: "1.5px",
                 }}
               >
-                Formats covered
+                Formats tracked
               </h3>
               <ul
                 style={{
@@ -1428,7 +1810,7 @@ export default function Home() {
                   maxWidth: "40ch",
                 }}
               >
-                Not affiliated with AMC Theatres, IMAX Corporation, or the
+                Not affiliated with AMC Theatres, IMAX Corporation, or any
                 filmmakers. Independent fan tool. Showtimes sourced from
                 AMC&apos;s public website.
               </p>

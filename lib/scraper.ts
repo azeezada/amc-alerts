@@ -1,6 +1,8 @@
 // AMC Showtime Scraper — multi-theater, multi-format
 // Uses AMC SSR HTML parsing — confirmed working via research
 
+import { getMarketForTheater } from "@/lib/theaters";
+
 export interface Showtime {
   id: string;
   time: string;
@@ -36,6 +38,12 @@ export interface MultiStatusResult {
   checkedAt: string;
 }
 
+export interface MovieInfo {
+  slug: string;
+  title: string;
+  formats: string[];
+}
+
 /* -------------------------------------------------------------------------
    Config
    ------------------------------------------------------------------------- */
@@ -52,8 +60,8 @@ export const FORMATS = [
   { tag: "imax", label: "IMAX", priority: 3 },
 ];
 
-const MARKET_SLUG = "new-york-city";
-const MOVIE_SLUG = "project-hail-mary-76779";
+const DEFAULT_MARKET_SLUG = "new-york-city";
+const DEFAULT_MOVIE_SLUG = "project-hail-mary-76779";
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15";
@@ -80,8 +88,9 @@ export function formatDateNice(dateStr: string): string {
    Fetch
    ------------------------------------------------------------------------- */
 
-async function fetchPage(date: string, theaterSlug: string): Promise<string | null> {
-  const url = `https://www.amctheatres.com/movie-theatres/${MARKET_SLUG}/${theaterSlug}/showtimes?date=${date}`;
+export async function fetchPage(date: string, theaterSlug: string, marketSlug?: string): Promise<string | null> {
+  const market = marketSlug || getMarketForTheater(theaterSlug) || DEFAULT_MARKET_SLUG;
+  const url = `https://www.amctheatres.com/movie-theatres/${market}/${theaterSlug}/showtimes?date=${date}`;
   try {
     const resp = await fetch(url, {
       headers: {
@@ -108,12 +117,6 @@ async function fetchPage(date: string, theaterSlug: string): Promise<string | nu
 
 /**
  * Extract showtimes for a given format tag from AMC's SSR HTML.
- *
- * The HTML contains anchor tags like:
- *   <a aria-describedby="...imax70mm..." id="140840268" href="/showtimes/140840268">
- *     11:00<!-- -->am
- *
- * For standard IMAX (tag="imax"), we exclude IMAX 70mm entries.
  */
 function extractFormatShowtimes(html: string, formatTag: string): Showtime[] {
   const showtimes: Showtime[] = [];
@@ -128,7 +131,6 @@ function extractFormatShowtimes(html: string, formatTag: string): Showtime[] {
     const describedBy = match[1].toLowerCase();
 
     if (!describedBy.includes(formatTag)) continue;
-    // Standard IMAX should not match IMAX 70mm entries
     if (isStandardImax && describedBy.includes("imax70mm")) continue;
 
     const id = match[3];
@@ -138,7 +140,6 @@ function extractFormatShowtimes(html: string, formatTag: string): Showtime[] {
     if (seen.has(id)) continue;
     seen.add(id);
 
-    // Look for sr-only span in the next 250 chars for status
     const afterPos = match.index + match[0].length;
     const afterChunk = html.slice(afterPos, afterPos + 250);
     const srMatch = afterChunk.match(
@@ -162,7 +163,6 @@ function extractFormatShowtimes(html: string, formatTag: string): Showtime[] {
     });
   }
 
-  // Sort by time (12-hour aware)
   return showtimes.sort((a, b) => {
     const toMins = (s: Showtime) => {
       const [h, m] = s.time.split(":").map(Number);
@@ -178,22 +178,63 @@ function extractFormatShowtimes(html: string, formatTag: string): Showtime[] {
   });
 }
 
+/**
+ * Extract ALL movies from an AMC showtimes page.
+ * AMC pages have movie sections with links like /movies/{slug}
+ */
+export function extractMoviesFromPage(html: string): MovieInfo[] {
+  const movies: MovieInfo[] = [];
+  const seen = new Set<string>();
+
+  const movieLinkRegex = /<a[^>]*href="\/movies\/([a-z0-9-]+)"[^>]*>([^<]+)<\/a>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = movieLinkRegex.exec(html)) !== null) {
+    const slug = match[1];
+    if (seen.has(slug)) continue;
+    seen.add(slug);
+
+    const title = match[2].trim();
+    if (!title || title.length < 2) continue;
+
+    // Find formats by scanning nearby HTML
+    const sectionStart = Math.max(0, match.index - 500);
+    const sectionEnd = Math.min(html.length, match.index + 5000);
+    const section = html.slice(sectionStart, sectionEnd).toLowerCase();
+
+    const formats: string[] = [];
+    if (section.includes("imax70mm")) formats.push("imax70mm");
+    if (section.includes("dolbycinema")) formats.push("dolbycinema");
+    if (section.includes("imax") && !formats.includes("imax70mm")) formats.push("imax");
+    if (formats.includes("imax70mm")) {
+      const imaxMatches = section.match(/imax(?!70mm)/g);
+      if (imaxMatches && imaxMatches.length > 0) formats.push("imax");
+    }
+    if (formats.length === 0) formats.push("standard");
+
+    movies.push({ slug, title, formats });
+  }
+
+  return movies;
+}
+
 /* -------------------------------------------------------------------------
    Public API
    ------------------------------------------------------------------------- */
 
-/** Check a single date at a specific theater+format (backward-compat defaults). */
+/** Check a single date at a specific theater+format. */
 export async function checkDate(
   date: string,
   theaterSlug = "amc-lincoln-square-13",
-  formatTag = "imax70mm"
+  formatTag = "imax70mm",
+  movieSlug = DEFAULT_MOVIE_SLUG
 ): Promise<DateResult> {
   const html = await fetchPage(date, theaterSlug);
   if (!html) {
     return { date, available: false, showtimes: [], error: "Fetch failed" };
   }
 
-  if (!html.includes(MOVIE_SLUG)) {
+  if (!html.includes(movieSlug)) {
     return { date, available: false, showtimes: [] };
   }
 
@@ -228,35 +269,43 @@ export async function checkAllDates(
 }
 
 /**
- * Fan out across all THEATERS × TARGET_DATES, fetching each page ONCE
- * and extracting all FORMATS from the same HTML.
- * Adds 200ms delay between page fetches to avoid hammering AMC.
+ * Fan out across theaters × dates, fetching each page ONCE
+ * and extracting all formats from the same HTML.
+ * Now accepts optional parameters for dynamic usage.
  */
-export async function checkAllTheatersAndFormats(): Promise<MultiStatusResult> {
+export async function checkAllTheatersAndFormats(opts?: {
+  theaters?: { slug: string; name: string; neighborhood: string }[];
+  dates?: string[];
+  movieSlug?: string;
+  formats?: { tag: string; label: string; priority: number }[];
+}): Promise<MultiStatusResult> {
+  const theaterList = opts?.theaters || THEATERS;
+  const dateList = opts?.dates || TARGET_DATES;
+  const movieSlug = opts?.movieSlug || DEFAULT_MOVIE_SLUG;
+  const formatList = opts?.formats || FORMATS;
+
   const theaterResults: Record<string, TheaterResult> = {};
 
-  for (const theater of THEATERS) {
+  for (const theater of theaterList) {
     theaterResults[theater.slug] = {
       name: theater.name,
       neighborhood: theater.neighborhood,
       formats: {},
     };
 
-    // Initialize format containers
-    for (const format of FORMATS) {
+    for (const format of formatList) {
       theaterResults[theater.slug].formats[format.tag] = { dates: {} };
     }
 
-    // Fetch each date page ONCE, extract all formats from the same HTML
-    for (const date of TARGET_DATES) {
+    for (const date of dateList) {
       const html = await fetchPage(date, theater.slug);
 
-      for (const format of FORMATS) {
+      for (const format of formatList) {
         const container = theaterResults[theater.slug].formats[format.tag].dates;
 
         if (!html) {
           container[date] = { date, available: false, showtimes: [], error: "Fetch failed" };
-        } else if (!html.includes(MOVIE_SLUG)) {
+        } else if (!html.includes(movieSlug)) {
           container[date] = { date, available: false, showtimes: [] };
         } else if (!html.toLowerCase().includes(format.tag)) {
           container[date] = { date, available: false, showtimes: [] };
@@ -266,7 +315,6 @@ export async function checkAllTheatersAndFormats(): Promise<MultiStatusResult> {
         }
       }
 
-      // Polite delay between page fetches (200ms)
       await new Promise((r) => setTimeout(r, 200));
     }
   }
