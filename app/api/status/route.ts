@@ -1,20 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAllDates, TARGET_DATES } from "@/lib/scraper";
+import { getCfEnv, type D1Database } from "@/lib/cf-env";
 
 export const runtime = "edge";
 
+
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
-
-interface D1Database {
-  prepare(query: string): D1PreparedStatement;
-}
-
-interface D1PreparedStatement {
-  bind(...values: unknown[]): D1PreparedStatement;
-  run(): Promise<{ success: boolean }>;
-  first<T = Record<string, unknown>>(): Promise<T | null>;
-  all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
-}
 
 interface CacheRow {
   date: string;
@@ -22,10 +13,9 @@ interface CacheRow {
   checked_at: string;
 }
 
-export async function GET(request: NextRequest) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const env = (process as any).env as unknown as { DB?: D1Database };
-  const db = env?.DB;
+export async function GET(_request: NextRequest) {
+  const env = await getCfEnv();
+  const db: D1Database | undefined = env.DB;
 
   try {
     // Check D1 cache if available
@@ -53,16 +43,8 @@ export async function GET(request: NextRequest) {
 
       if (allCached) {
         return NextResponse.json(
-          {
-            dates: cachedResults,
-            checkedAt: new Date().toISOString(),
-            cached: true,
-          },
-          {
-            headers: {
-              "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
-            },
-          }
+          { dates: cachedResults, checkedAt: new Date().toISOString(), cached: true },
+          { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } }
         );
       }
     }
@@ -74,9 +56,7 @@ export async function GET(request: NextRequest) {
     if (db) {
       for (const [date, dateResult] of Object.entries(result.dates)) {
         await db
-          .prepare(
-            "INSERT OR REPLACE INTO showtime_cache (date, data, checked_at) VALUES (?, ?, datetime('now'))"
-          )
+          .prepare("INSERT OR REPLACE INTO showtime_cache (date, data, checked_at) VALUES (?, ?, datetime('now'))")
           .bind(date, JSON.stringify(dateResult))
           .run();
       }
@@ -84,17 +64,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       { ...result, cached: false },
-      {
-        headers: {
-          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
-        },
-      }
+      { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } }
     );
   } catch (e) {
     console.error("Status error:", e);
-    return NextResponse.json(
-      { error: "Failed to fetch showtimes" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to fetch showtimes", detail: String(e) }, { status: 500 });
   }
 }

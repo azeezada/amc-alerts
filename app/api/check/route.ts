@@ -1,24 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAllDates, DateResult, TARGET_DATES } from "@/lib/scraper";
 import { buildEmailHtml, buildEmailText } from "@/lib/email";
+import { getCfEnv, type D1Database } from "@/lib/cf-env";
 
 export const runtime = "edge";
 
-interface D1Database {
-  prepare(query: string): D1PreparedStatement;
-}
-
-interface D1PreparedStatement {
-  bind(...values: unknown[]): D1PreparedStatement;
-  run(): Promise<{ success: boolean }>;
-  first<T = Record<string, unknown>>(): Promise<T | null>;
-  all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
-}
 
 interface CacheRow {
   date: string;
   data: string;
-  checked_at: string;
 }
 
 interface SubscriberRow {
@@ -41,7 +31,7 @@ async function sendEmailViaResend(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "IMAX Alerts <alerts@amc-alerts.info>",
+      from: "IMAX Alerts <alerts@churnrecovery.com>",
       to,
       subject: "🎬 IMAX 70mm Tickets Available — Project Hail Mary",
       html,
@@ -53,18 +43,16 @@ async function sendEmailViaResend(
     const err = await resp.text();
     throw new Error(`Resend error ${resp.status}: ${err}`);
   }
-
   return resp.json();
 }
 
-// POST /api/check — called by CF Cron Trigger
-// Also accepts GET for manual testing
+// POST /api/check — called by CF Cron Trigger or manual
 export async function POST(request: NextRequest) {
   return runCheck(request);
 }
 
+// GET /api/check?secret=hailmary — manual trigger
 export async function GET(request: NextRequest) {
-  // Allow manual trigger via GET for testing
   const url = new URL(request.url);
   if (url.searchParams.get("secret") !== "hailmary") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -73,29 +61,19 @@ export async function GET(request: NextRequest) {
 }
 
 async function runCheck(_request: NextRequest) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const env = (process as any).env as unknown as {
-    DB?: D1Database;
-    RESEND_API_KEY?: string;
-  };
-
-  const db = env?.DB;
-  const resendApiKey = env?.RESEND_API_KEY;
+  const env = await getCfEnv();
+  const db: D1Database | undefined = env.DB;
+  const resendApiKey: string | undefined = env.RESEND_API_KEY;
 
   const log: string[] = [];
-  const logLine = (msg: string) => {
-    console.log(msg);
-    log.push(msg);
-  };
+  const logLine = (msg: string) => { console.log(msg); log.push(msg); };
 
   logLine("=== AMC Check Started ===");
 
   try {
-    // Fetch current showtimes
     const result = await checkAllDates();
     logLine(`Fetched ${TARGET_DATES.length} dates`);
 
-    // Find newly available dates (weren't available before, now are)
     const newlyAvailable: DateResult[] = [];
 
     for (const [date, dateResult] of Object.entries(result.dates)) {
@@ -104,11 +82,8 @@ async function runCheck(_request: NextRequest) {
         continue;
       }
 
-      logLine(
-        `${date}: ${dateResult.showtimes.length} showtime(s) found`
-      );
+      logLine(`${date}: ${dateResult.showtimes.length} showtime(s) found`);
 
-      // Check if we previously had this cached
       if (db) {
         const cached = await db
           .prepare("SELECT data FROM showtime_cache WHERE date = ?")
@@ -116,7 +91,6 @@ async function runCheck(_request: NextRequest) {
           .first<CacheRow>();
 
         if (!cached) {
-          // Newly discovered!
           logLine(`  → NEW DATE (not in cache)`);
           newlyAvailable.push(dateResult);
         } else {
@@ -125,25 +99,22 @@ async function runCheck(_request: NextRequest) {
             logLine(`  → NEW (was unavailable before)`);
             newlyAvailable.push(dateResult);
           } else {
-            logLine(`  → Already known, checking for new showtimes...`);
             const prevIds = new Set(prevData.showtimes.map((s) => s.id));
             const newIds = dateResult.showtimes.filter((s) => !prevIds.has(s.id));
             if (newIds.length > 0) {
               logLine(`  → ${newIds.length} new showtime(s) added`);
               newlyAvailable.push(dateResult);
+            } else {
+              logLine(`  → Already known, no changes`);
             }
           }
         }
 
-        // Update cache
         await db
-          .prepare(
-            "INSERT OR REPLACE INTO showtime_cache (date, data, checked_at) VALUES (?, ?, datetime('now'))"
-          )
+          .prepare("INSERT OR REPLACE INTO showtime_cache (date, data, checked_at) VALUES (?, ?, datetime('now'))")
           .bind(date, JSON.stringify(dateResult))
           .run();
       } else {
-        // No DB — treat all available as new for testing
         newlyAvailable.push(dateResult);
       }
     }
@@ -154,30 +125,16 @@ async function runCheck(_request: NextRequest) {
       return NextResponse.json({ log, notified: 0, newDates: [] });
     }
 
-    // Get subscribers to notify
     if (!db) {
       logLine("[DEV] No DB — skipping notifications");
-      return NextResponse.json({
-        log,
-        notified: 0,
-        newDates: newlyAvailable.map((d) => d.date),
-        devMode: true,
-      });
+      return NextResponse.json({ log, notified: 0, newDates: newlyAvailable.map((d) => d.date), devMode: true });
     }
 
     if (!resendApiKey) {
       logLine("No RESEND_API_KEY set — skipping email");
-      return NextResponse.json({
-        log,
-        notified: 0,
-        newDates: newlyAvailable.map((d) => d.date),
-        error: "No RESEND_API_KEY",
-      });
+      return NextResponse.json({ log, notified: 0, newDates: newlyAvailable.map((d) => d.date), error: "No RESEND_API_KEY" });
     }
 
-    const newDateStrings = newlyAvailable.map((d) => d.date);
-
-    // Get subscribers interested in at least one of the new dates
     const { results: subscribers } = await db
       .prepare("SELECT email, dates FROM subscribers WHERE active = 1")
       .all<SubscriberRow>();
@@ -188,7 +145,7 @@ async function runCheck(_request: NextRequest) {
     for (const sub of subscribers) {
       const subDates: string[] = JSON.parse(sub.dates || "[]");
       const relevantDates = newlyAvailable.filter(
-        (d) => subDates.includes(d.date) || subDates.length === 0
+        (d) => subDates.length === 0 || subDates.includes(d.date)
       );
 
       if (relevantDates.length === 0) continue;
@@ -204,18 +161,11 @@ async function runCheck(_request: NextRequest) {
       } catch (e) {
         logLine(`  ✗ Failed to notify ${sub.email}: ${e}`);
       }
-
-      // Rate limit: don't blast too fast
       await new Promise((r) => setTimeout(r, 100));
     }
 
     logLine(`=== Done. Notified ${notified} subscribers ===`);
-
-    return NextResponse.json({
-      log,
-      notified,
-      newDates: newDateStrings,
-    });
+    return NextResponse.json({ log, notified, newDates: newlyAvailable.map((d) => d.date) });
   } catch (e) {
     logLine(`ERROR: ${e}`);
     return NextResponse.json({ error: String(e), log }, { status: 500 });

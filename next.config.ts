@@ -1,8 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Required for Cloudflare Pages with next-on-pages
-  experimental: {},
+  // No "output: export" — API routes need server runtime
 };
 
 export default nextConfig;

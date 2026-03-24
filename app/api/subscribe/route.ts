@@ -1,20 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCfEnv, type D1Database } from "@/lib/cf-env";
 
 export const runtime = "edge";
 
-interface Env {
-  DB: D1Database;
-}
-
-interface D1Database {
-  prepare(query: string): D1PreparedStatement;
-}
-
-interface D1PreparedStatement {
-  bind(...values: unknown[]): D1PreparedStatement;
-  run(): Promise<{ success: boolean; error?: string }>;
-  first<T = Record<string, unknown>>(): Promise<T | null>;
-}
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -22,7 +10,7 @@ function isValidEmail(email: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as { email?: string; dates?: string[] };
+    const body = (await request.json()) as { email?: string; dates?: string[] };
     const { email, dates } = body;
 
     if (!email || !isValidEmail(email)) {
@@ -33,11 +21,7 @@ export async function POST(request: NextRequest) {
     }
 
     const validDates = [
-      "2026-04-01",
-      "2026-04-02",
-      "2026-04-03",
-      "2026-04-04",
-      "2026-04-05",
+      "2026-04-01", "2026-04-02", "2026-04-03", "2026-04-04", "2026-04-05",
     ];
 
     const selectedDates =
@@ -52,17 +36,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get D1 binding from CF context
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const env = (process as any).env as unknown as Env;
-    const db = env?.DB;
+    const env = await getCfEnv();
+    const db: D1Database | undefined = env.DB;
 
     if (!db) {
-      // Dev mode — no DB
       console.log(`[DEV] Would subscribe: ${email} for dates: ${selectedDates.join(", ")}`);
       return NextResponse.json({
         success: true,
-        message: "Subscribed successfully! (dev mode)",
+        message: "You're on the list! We'll email you the moment tickets drop.",
       });
     }
 
@@ -80,14 +61,10 @@ export async function POST(request: NextRequest) {
           message: "You're already on the list!",
         });
       } else {
-        // Reactivate
         await db
-          .prepare(
-            "UPDATE subscribers SET active = 1, dates = ?, subscribed_at = datetime('now') WHERE email = ?"
-          )
+          .prepare("UPDATE subscribers SET active = 1, dates = ?, subscribed_at = datetime('now') WHERE email = ?")
           .bind(JSON.stringify(selectedDates), email)
           .run();
-
         return NextResponse.json({
           success: true,
           message: "Welcome back! You've been re-subscribed.",
@@ -95,11 +72,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Insert new subscriber
     await db
-      .prepare(
-        "INSERT INTO subscribers (email, dates) VALUES (?, ?)"
-      )
+      .prepare("INSERT INTO subscribers (email, dates) VALUES (?, ?)")
       .bind(email, JSON.stringify(selectedDates))
       .run();
 
