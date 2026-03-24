@@ -2,7 +2,8 @@ import { DateResult, formatDateNice } from "./scraper";
 
 export function buildEmailHtml(
   newDates: DateResult[],
-  unsubscribeToken?: string
+  unsubscribeToken?: string,
+  email?: string
 ): string {
   const dateRows = newDates
     .map((d) => {
@@ -45,9 +46,9 @@ export function buildEmailHtml(
     })
     .join("");
 
-  const unsubLink = unsubscribeToken
+  const unsubLink = unsubscribeToken && email
     ? `<p style="color:#6b7280;font-size:12px;margin-top:24px;text-align:center;">
-        <a href="https://amc-alerts.pages.dev/unsubscribe?token=${unsubscribeToken}" style="color:#6b7280;">
+        <a href="https://amc-alerts.pages.dev/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&email=${encodeURIComponent(email)}" style="color:#6b7280;">
           Unsubscribe
         </a>
       </p>`

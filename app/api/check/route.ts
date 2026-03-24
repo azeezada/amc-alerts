@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAllTheatersAndFormats, DateResult, TARGET_DATES, THEATERS, FORMATS } from "@/lib/scraper";
 import { buildEmailHtml, buildEmailText } from "@/lib/email";
 import { getCfEnv, type D1Database } from "@/lib/cf-env";
+import { generateUnsubscribeToken } from "@/lib/unsubscribe-token";
 
 export const runtime = "edge";
 
@@ -24,7 +25,8 @@ async function sendEmailViaResend(
   newDates: DateResult[],
   resendApiKey: string
 ) {
-  const html = buildEmailHtml(newDates);
+  const unsubscribeToken = await generateUnsubscribeToken(to);
+  const html = buildEmailHtml(newDates, unsubscribeToken, to);
   const text = buildEmailText(newDates);
 
   const resp = await fetch("https://api.resend.com/emails", {
