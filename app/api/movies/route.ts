@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchPage, extractMoviesFromPage } from "@/lib/scraper";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "edge";
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request, { limit: 20, windowMs: 60_000 });
+  if (limited) return limited;
+
   const theater = request.nextUrl.searchParams.get("theater");
   const date = request.nextUrl.searchParams.get("date");
 

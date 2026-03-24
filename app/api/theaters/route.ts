@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MARKETS, POPULAR_THEATERS, searchTheaters } from "@/lib/theaters";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "edge";
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request, { limit: 30, windowMs: 60_000 });
+  if (limited) return limited;
+
   const q = request.nextUrl.searchParams.get("q") || "";
   const market = request.nextUrl.searchParams.get("market") || "";
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAllTheatersAndFormats, THEATERS, FORMATS, TARGET_DATES } from "@/lib/scraper";
 import { getCfEnv, type D1Database } from "@/lib/cf-env";
 import { POPULAR_THEATERS } from "@/lib/theaters";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "edge";
 
@@ -32,6 +33,9 @@ function resolveTheaters(slugs: string[]): { slug: string; name: string; neighbo
 }
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request, { limit: 20, windowMs: 60_000 });
+  if (limited) return limited;
+
   const env = await getCfEnv();
   const db: D1Database | undefined = env.DB;
 

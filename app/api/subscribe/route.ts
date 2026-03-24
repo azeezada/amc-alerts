@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCfEnv, type D1Database } from "@/lib/cf-env";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "edge";
 
@@ -9,6 +10,9 @@ function isValidEmail(email: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  const limited = rateLimit(request, { limit: 5, windowMs: 60_000 });
+  if (limited) return limited;
+
   try {
     const body = (await request.json()) as { email?: string; dates?: string[] };
     const { email, dates } = body;
