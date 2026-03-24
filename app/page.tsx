@@ -526,6 +526,163 @@ function TheaterTabs({
 }
 
 /* =========================================================================
+   Comparison Grid — theaters × formats × dates matrix
+   ========================================================================= */
+function ComparisonGrid({
+  theaters,
+  theaterList,
+  dates,
+}: {
+  theaters: Record<string, TheaterData> | undefined;
+  theaterList: { slug: string; name: string; neighborhood: string }[];
+  dates: string[];
+}) {
+  if (!theaters) return null;
+
+  return (
+    <div style={{ overflowX: "auto", marginBottom: "var(--space-xl)" }}>
+      <table
+        style={{
+          width: "100%",
+          borderCollapse: "collapse",
+          fontSize: "var(--text-sm)",
+          minWidth: 600,
+        }}
+      >
+        <thead>
+          <tr>
+            <th
+              style={{
+                textAlign: "left",
+                padding: "var(--space-sm) var(--space-md)",
+                borderBottom: "1px solid var(--border-default)",
+                color: "var(--text-tertiary)",
+                fontSize: "var(--text-xs)",
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+                position: "sticky",
+                left: 0,
+                background: "var(--bg-base)",
+                zIndex: 1,
+              }}
+            >
+              Theater / Format
+            </th>
+            {dates.map((date) => {
+              const { weekday, date: label } = formatDateNice(date);
+              return (
+                <th
+                  key={date}
+                  style={{
+                    textAlign: "center",
+                    padding: "var(--space-sm) var(--space-md)",
+                    borderBottom: "1px solid var(--border-default)",
+                    color: "var(--text-tertiary)",
+                    fontSize: "var(--text-xs)",
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <div>{weekday.slice(0, 3)}</div>
+                  <div style={{ color: "var(--text-secondary)" }}>{label}</div>
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {theaterList.map((theater) => {
+            const theaterData = theaters[theater.slug];
+            if (!theaterData) return null;
+
+            return FORMAT_LIST.map((format) => {
+              const formatData = theaterData.formats[format.tag];
+              return (
+                <tr key={`${theater.slug}-${format.tag}`} className="showtime-row">
+                  <td
+                    style={{
+                      padding: "var(--space-sm) var(--space-md)",
+                      borderBottom: "1px solid var(--border-subtle)",
+                      whiteSpace: "nowrap",
+                      position: "sticky",
+                      left: 0,
+                      background: "var(--bg-base)",
+                      zIndex: 1,
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "var(--text-sm)" }}>
+                      {theater.name}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{format.label}</div>
+                  </td>
+                  {dates.map((date) => {
+                    const dateResult = formatData?.dates[date];
+                    const hasShowtimes = dateResult?.available && dateResult.showtimes.length > 0;
+                    return (
+                      <td
+                        key={date}
+                        style={{
+                          textAlign: "center",
+                          padding: "var(--space-xs) var(--space-sm)",
+                          borderBottom: "1px solid var(--border-subtle)",
+                          verticalAlign: "middle",
+                        }}
+                      >
+                        {hasShowtimes ? (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center" }}>
+                            {dateResult!.showtimes.map((st) => (
+                              <a
+                                key={st.id}
+                                href={st.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  display: "inline-block",
+                                  padding: "4px 8px",
+                                  borderRadius: 4,
+                                  border: `1px solid ${st.status === "SoldOut" ? "var(--text-disabled)" : "#FFFFFF"}`,
+                                  color: st.status === "SoldOut" ? "var(--text-disabled)" : "#FFFFFF",
+                                  textDecoration: st.status === "SoldOut" ? "line-through" : "none",
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: st.status === "SoldOut" ? "not-allowed" : "pointer",
+                                  transition: "all var(--dur-fast) var(--ease-default)",
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (st.status !== "SoldOut") {
+                                    (e.target as HTMLElement).style.background = "#FFFFFF";
+                                    (e.target as HTMLElement).style.color = "#000000";
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (st.status !== "SoldOut") {
+                                    (e.target as HTMLElement).style.background = "transparent";
+                                    (e.target as HTMLElement).style.color = "#FFFFFF";
+                                  }
+                                }}
+                              >
+                                {st.time}
+                              </a>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ color: "var(--text-disabled)", fontSize: 12 }}>—</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            });
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* =========================================================================
    Format Pills
    ========================================================================= */
 function FormatPills({
@@ -1222,6 +1379,7 @@ export default function Home() {
   const [lastChecked, setLastChecked] = useState<string>("");
   const [selectedTheater, setSelectedTheater] = useState("");
   const [selectedFormat, setSelectedFormat] = useState(FORMAT_LIST[0].tag);
+  const [compareMode, setCompareMode] = useState(false);
 
   // Initialize from URL params or localStorage
   useEffect(() => {
@@ -1575,6 +1733,18 @@ export default function Home() {
                 )}
                 <button
                   className="btn-ghost"
+                  onClick={() => setCompareMode(!compareMode)}
+                  style={{
+                    fontSize: "var(--text-xs)",
+                    borderColor: compareMode ? "#FFFFFF" : undefined,
+                    background: compareMode ? "#FFFFFF" : undefined,
+                    color: compareMode ? "#000000" : undefined,
+                  }}
+                >
+                  {compareMode ? "Card view" : "Compare all"}
+                </button>
+                <button
+                  className="btn-ghost"
                   onClick={startOver}
                   data-testid="change-selection"
                   style={{ fontSize: "var(--text-xs)" }}
@@ -1584,6 +1754,14 @@ export default function Home() {
               </div>
             </div>
 
+            {compareMode ? (
+              <ComparisonGrid
+                theaters={status?.theaters}
+                theaterList={theaterList}
+                dates={selectedDates}
+              />
+            ) : (
+            <>
             {/* Theater tabs */}
             <TheaterTabs
               selected={selectedTheater}
@@ -1623,6 +1801,8 @@ export default function Home() {
                 />
               ))}
             </div>
+            </>
+            )}
 
             {/* ===== MOVIE INFO SECTION ===== */}
             <div style={{ marginTop: "var(--space-2xl)", display: "flex", flexDirection: "column", gap: "var(--space-2xl)" }}>
