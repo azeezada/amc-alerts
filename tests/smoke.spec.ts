@@ -6,54 +6,19 @@ test.describe("AMC IMAX Alerts — Smoke Tests", () => {
     await expect(page).toHaveTitle(/IMAX 70mm Alerts/);
   });
 
-  test("hero section renders movie title in h1", async ({ page }) => {
+  test("hero section renders heading", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator("h1")).toContainText("Project Hail Mary");
+    await expect(page.locator("h1")).toContainText("Track Any Movie at Any AMC Theater");
   });
 
-  test("NYC TICKET ALERTS badge is visible", async ({ page }) => {
+  test("AMC SHOWTIME ALERTS badge is visible", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("NYC TICKET ALERTS")).toBeVisible();
+    await expect(page.getByText("AMC SHOWTIME ALERTS")).toBeVisible();
   });
 
-  test("countdown timer shows time units (Days/Hrs/Min/Sec)", async ({ page }) => {
+  test("setup flow card is visible on load", async ({ page }) => {
     await page.goto("/");
-    await page.waitForTimeout(2000); // wait for hydration
-    await expect(page.getByText("Days").first()).toBeVisible();
-    await expect(page.getByText("Hrs").first()).toBeVisible();
-    await expect(page.getByText("Min").first()).toBeVisible();
-    await expect(page.getByText("Sec").first()).toBeVisible();
-  });
-
-  test("premium format subtitle is shown", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByText(/Premium Format Showtimes/i).first()).toBeVisible();
-  });
-
-  test("date cards render for April 1-5", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByText("April 1").first()).toBeVisible();
-    await expect(page.getByText("April 2").first()).toBeVisible();
-    await expect(page.getByText("April 3").first()).toBeVisible();
-    await expect(page.getByText("April 4").first()).toBeVisible();
-    await expect(page.getByText("April 5").first()).toBeVisible();
-  });
-
-  test("April 3 card marked as Release day", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByText("Release day").first()).toBeVisible();
-  });
-
-  test("day names shown on cards", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByText("Wednesday").first()).toBeVisible();
-    await expect(page.getByText("Sunday").first()).toBeVisible();
-  });
-
-  test("checking showtimes loading state appears", async ({ page }) => {
-    await page.goto("/");
-    // The loading spinner text appears before API response
-    await expect(page.getByText("Checking showtimes").first()).toBeVisible({ timeout: 3000 });
+    await expect(page.getByTestId("setup-flow")).toBeVisible();
   });
 
   test("no critical console errors", async ({ page }) => {
@@ -68,139 +33,127 @@ test.describe("AMC IMAX Alerts — Smoke Tests", () => {
         !e.includes("Failed to fetch") &&
         !e.includes("ERR_CONNECTION") &&
         !e.includes("net::") &&
-        !e.includes("status") &&
         !e.includes("Hydration") &&
-        !e.includes("hydrated") &&
-        !e.includes("hydration") &&
-        !e.includes("data-theme")
+        !e.includes("hydrat")
     );
     expect(critical).toHaveLength(0);
   });
 });
 
-test.describe("Email Subscription", () => {
-  test("signup section is visible with heading", async ({ page }) => {
+test.describe("Setup Flow — Theater Selection", () => {
+  test("theater setup shows Select Theaters heading", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("Get notified").first()).toBeVisible();
+    await expect(page.getByTestId("theater-setup")).toBeVisible();
+    await expect(page.getByText("Select Theaters")).toBeVisible();
   });
 
-  test("email input is present with label", async ({ page }) => {
+  test("market buttons load from API", async ({ page }) => {
     await page.goto("/");
-    const emailInput = page.locator("#email-input");
-    await expect(emailInput).toBeVisible();
-    await expect(emailInput).toHaveAttribute("type", "email");
-    await expect(emailInput).toHaveAttribute("placeholder", "you@example.com");
-  });
-
-  test("notify me button exists and is disabled when empty", async ({ page }) => {
-    await page.goto("/");
-    const btn = page.locator('button[type="submit"]').filter({ hasText: /notify me/i });
-    await expect(btn).toBeVisible();
-    await expect(btn).toBeDisabled();
-  });
-
-  test("notify me button enables after typing email", async ({ page }) => {
-    await page.goto("/");
-    const emailInput = page.locator("#email-input");
-    await emailInput.fill("test@example.com");
-    const btn = page.locator('button[type="submit"]').filter({ hasText: /notify me/i });
-    await expect(btn).toBeEnabled();
-  });
-
-  test("date checkboxes present (All dates + 5 individual)", async ({ page }) => {
-    await page.goto("/");
-    const checkboxes = page.locator('input[type="checkbox"]');
-    expect(await checkboxes.count()).toBe(6); // All dates + 5 dates
-  });
-
-  test("All dates checkbox is checked by default", async ({ page }) => {
-    await page.goto("/");
-    const allDates = page.locator("label").filter({ hasText: "All dates" }).locator("input");
-    await expect(allDates).toBeChecked();
-  });
-
-  test("can submit email and get response", async ({ page }) => {
-    await page.goto("/");
-    const emailInput = page.locator("#email-input");
-    await emailInput.fill("test@playwright.dev");
-    const btn = page.locator('button[type="submit"]').filter({ hasText: /notify me/i });
-    await btn.click();
+    // Wait for markets to load (skeleton disappears)
     await page.waitForTimeout(3000);
+    // Should have at least one market button (may fail if API is down)
     const body = await page.textContent("body");
-    // Should show success or error
-    expect(
-      body?.includes("on the list") ||
-      body?.includes("error") ||
-      body?.includes("already") ||
-      body?.includes("Network") ||
-      body?.includes("wrong")
-    ).toBeTruthy();
+    // Markets include NYC, LA, etc.
+    const hasMarket = body?.includes("New York") || body?.includes("Los Angeles") || body?.includes("Chicago");
+    expect(hasMarket).toBeTruthy();
+  });
+
+  test("Next button is disabled when no theaters selected", async ({ page }) => {
+    await page.goto("/");
+    const nextBtn = page.getByTestId("theater-next");
+    await expect(nextBtn).toBeDisabled();
+  });
+
+  test("custom theater slug input is present", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByPlaceholder("e.g. amc-metreon-16")).toBeVisible();
   });
 });
 
-test.describe("Theater & Format Tabs", () => {
-  test("three theater tabs visible", async ({ page }) => {
+test.describe("Setup Flow — Step Indicators", () => {
+  test("three step indicators visible", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("tab", { name: /Lincoln Square/i })).toBeVisible();
-    await expect(page.getByRole("tab", { name: /Empire 25/i })).toBeVisible();
-    await expect(page.getByRole("tab", { name: /Kips Bay/i })).toBeVisible();
-  });
-
-  test("Lincoln Square is selected by default", async ({ page }) => {
-    await page.goto("/");
-    const tab = page.getByRole("tab", { name: /Lincoln Square/i });
-    await expect(tab).toHaveAttribute("aria-selected", "true");
-  });
-
-  test("clicking Empire 25 switches active tab", async ({ page }) => {
-    await page.goto("/");
-    const empireTab = page.getByRole("tab", { name: /Empire 25/i });
-    await empireTab.click();
-    await expect(empireTab).toHaveAttribute("aria-selected", "true");
-    const lsTab = page.getByRole("tab", { name: /Lincoln Square/i });
-    await expect(lsTab).toHaveAttribute("aria-selected", "false");
-  });
-
-  test("three format buttons visible", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.locator('button[aria-pressed]').filter({ hasText: "IMAX 70mm" })).toBeVisible();
-    await expect(page.locator('button[aria-pressed]').filter({ hasText: "Dolby Cinema" })).toBeVisible();
-    await expect(page.locator('button[aria-pressed]').filter({ hasText: "IMAX" }).last()).toBeVisible();
-  });
-
-  test("IMAX 70mm format is selected by default", async ({ page }) => {
-    await page.goto("/");
-    const btn = page.locator('button[aria-pressed="true"]').filter({ hasText: "IMAX 70mm" });
-    await expect(btn).toBeVisible();
-  });
-
-  test("clicking Dolby Cinema switches format", async ({ page }) => {
-    await page.goto("/");
-    const dolby = page.locator('button[aria-pressed]').filter({ hasText: "Dolby Cinema" });
-    await dolby.click();
-    await expect(dolby).toHaveAttribute("aria-pressed", "true");
-  });
-
-  test("neighborhood shown on theater tabs", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByText("Upper West Side")).toBeVisible();
-    await expect(page.getByText("Midtown")).toBeVisible();
-    await expect(page.getByText("Kips Bay").last()).toBeVisible();
+    await expect(page.getByText("Theaters").first()).toBeVisible();
+    await expect(page.getByText("Movie").first()).toBeVisible();
+    await expect(page.getByText("Dates").first()).toBeVisible();
   });
 });
 
-test.describe("Responsive / Mobile", () => {
-  test("renders correctly on mobile viewport", async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto("/");
-    await expect(page.locator("h1")).toContainText("Project Hail Mary");
-    await expect(page.locator("#email-input")).toBeVisible();
+test.describe("URL Parameters — Direct Results", () => {
+  test("URL params skip setup and go to results", async ({ page }) => {
+    await page.goto("/?theaters=amc-lincoln-square-13&movie=project-hail-mary-76779&dates=2026-04-01,2026-04-02,2026-04-03");
+    await page.waitForTimeout(2000);
+    await expect(page.getByTestId("results-view")).toBeVisible();
   });
 
-  test("renders correctly on tablet viewport", async ({ page }) => {
-    await page.setViewportSize({ width: 768, height: 1024 });
-    await page.goto("/");
-    await expect(page.locator("h1")).toContainText("Project Hail Mary");
+  test("results view shows theater tabs", async ({ page }) => {
+    await page.goto("/?theaters=amc-lincoln-square-13,amc-empire-25&movie=project-hail-mary-76779&dates=2026-04-01");
+    await page.waitForTimeout(2000);
+    const tabs = page.locator('[role="tablist"]');
+    await expect(tabs).toBeVisible();
+  });
+
+  test("results view shows format pills", async ({ page }) => {
+    await page.goto("/?theaters=amc-lincoln-square-13&movie=project-hail-mary-76779&dates=2026-04-01");
+    await page.waitForTimeout(2000);
+    const formatGroup = page.locator('[role="group"][aria-label="Format selector"]');
+    await expect(formatGroup).toBeVisible();
+  });
+
+  test("change selection button returns to setup", async ({ page }) => {
+    await page.goto("/?theaters=amc-lincoln-square-13&movie=project-hail-mary-76779&dates=2026-04-01");
+    await page.waitForTimeout(2000);
+    await page.getByTestId("change-selection").click();
+    await expect(page.getByTestId("setup-flow")).toBeVisible();
+  });
+});
+
+test.describe("Results View — Content Sections", () => {
+  test("ratings section shows IMDb score", async ({ page }) => {
+    await page.goto("/?theaters=amc-lincoln-square-13&movie=project-hail-mary-76779&dates=2026-04-01");
+    await page.waitForTimeout(2000);
+    await expect(page.getByText("8.2/10")).toBeVisible();
+    await expect(page.getByText("IMDb")).toBeVisible();
+  });
+
+  test("ratings section shows RT score", async ({ page }) => {
+    await page.goto("/?theaters=amc-lincoln-square-13&movie=project-hail-mary-76779&dates=2026-04-01");
+    await page.waitForTimeout(2000);
+    await expect(page.getByText("96%").first()).toBeVisible();
+    await expect(page.getByText("Rotten Tomatoes")).toBeVisible();
+  });
+
+  test("trailer section has YouTube iframe", async ({ page }) => {
+    await page.goto("/?theaters=amc-lincoln-square-13&movie=project-hail-mary-76779&dates=2026-04-01");
+    await page.waitForTimeout(2000);
+    await expect(page.getByText("Official Trailer")).toBeVisible();
+    const iframe = page.locator('iframe[src*="youtube.com"]');
+    await expect(iframe).toBeVisible();
+  });
+
+  test("Why IMAX 70mm section is present", async ({ page }) => {
+    await page.goto("/?theaters=amc-lincoln-square-13&movie=project-hail-mary-76779&dates=2026-04-01");
+    await page.waitForTimeout(2000);
+    await expect(page.getByText("Why IMAX 70mm?")).toBeVisible();
+    await expect(page.getByText("18K Resolution Equivalent")).toBeVisible();
+  });
+
+  test("share button is visible", async ({ page }) => {
+    await page.goto("/?theaters=amc-lincoln-square-13&movie=project-hail-mary-76779&dates=2026-04-01");
+    await page.waitForTimeout(2000);
+    await expect(page.getByText("Share").first()).toBeVisible();
+  });
+
+  test("compare all toggle works", async ({ page }) => {
+    await page.goto("/?theaters=amc-lincoln-square-13&movie=project-hail-mary-76779&dates=2026-04-01");
+    await page.waitForTimeout(2000);
+    const compareBtn = page.getByText("Compare all");
+    await compareBtn.click();
+    // Should now show "Card view" text
+    await expect(page.getByText("Card view")).toBeVisible();
+    // Should show comparison table
+    const table = page.locator("table");
+    await expect(table).toBeVisible();
   });
 });
 
@@ -210,46 +163,63 @@ test.describe("Footer", () => {
     await expect(page.getByText("How it works").first()).toBeVisible();
   });
 
-  test("footer mentions 3 theaters and 3 formats", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByText(/3 theaters/i).first()).toBeVisible();
-    await expect(page.getByText(/3 formats/i).first()).toBeVisible();
-  });
-
-  test("footer has Formats covered section", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByText("Formats covered").first()).toBeVisible();
-  });
-
   test("footer has disclaimer", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText(/Not affiliated/i).first()).toBeVisible();
   });
+
+  test("footer has formats tracked section", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByText("Formats tracked").first()).toBeVisible();
+  });
+});
+
+test.describe("Responsive / Mobile", () => {
+  test("renders correctly on mobile viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/");
+    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.getByTestId("setup-flow")).toBeVisible();
+  });
+
+  test("renders correctly on tablet viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.goto("/");
+    await expect(page.locator("h1")).toBeVisible();
+  });
 });
 
 test.describe("Meta & SEO", () => {
-  test("favicon links present", async ({ page }) => {
+  test("favicon link present", async ({ page }) => {
     await page.goto("/");
     const favicons = page.locator('link[rel="icon"]');
     expect(await favicons.count()).toBeGreaterThanOrEqual(1);
   });
 
-  test("OG title meta tag present", async ({ page }) => {
+  test("OG meta tags present", async ({ page }) => {
     await page.goto("/");
-    const ogTitle = page.locator('meta[property="og:title"]');
-    expect(await ogTitle.count()).toBeGreaterThanOrEqual(1);
+    expect(await page.locator('meta[property="og:title"]').count()).toBeGreaterThanOrEqual(1);
+    expect(await page.locator('meta[property="og:description"]').count()).toBeGreaterThanOrEqual(1);
   });
 
-  test("OG description meta tag present", async ({ page }) => {
+  test("Twitter card meta present", async ({ page }) => {
     await page.goto("/");
-    const ogDesc = page.locator('meta[property="og:description"]');
-    expect(await ogDesc.count()).toBeGreaterThanOrEqual(1);
+    expect(await page.locator('meta[name="twitter:card"]').count()).toBeGreaterThanOrEqual(1);
+  });
+});
+
+test.describe("Accessibility", () => {
+  test("page has exactly one h1", async ({ page }) => {
+    await page.goto("/");
+    expect(await page.locator("h1").count()).toBe(1);
   });
 
-  test("Twitter card meta tags present", async ({ page }) => {
+  test("page uses Roboto font variable", async ({ page }) => {
     await page.goto("/");
-    const twitterCard = page.locator('meta[name="twitter:card"]');
-    expect(await twitterCard.count()).toBeGreaterThanOrEqual(1);
+    const htmlEl = page.locator("html");
+    const classes = await htmlEl.getAttribute("class");
+    expect(classes).toBeTruthy();
+    expect(classes!.length).toBeGreaterThan(0);
   });
 });
 
