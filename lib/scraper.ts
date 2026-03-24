@@ -1,4 +1,4 @@
-// AMC IMAX 70mm Showtime Scraper
+// AMC Showtime Scraper — multi-theater, multi-format
 // Uses AMC SSR HTML parsing — confirmed working via research
 
 export interface Showtime {
@@ -21,9 +21,38 @@ export interface StatusResult {
   checkedAt: string;
 }
 
-const THEATER_SLUG = "amc-lincoln-square-13";
+export interface TheaterFormatResult {
+  dates: Record<string, DateResult>;
+}
+
+export interface TheaterResult {
+  name: string;
+  neighborhood: string;
+  formats: Record<string, TheaterFormatResult>;
+}
+
+export interface MultiStatusResult {
+  theaters: Record<string, TheaterResult>;
+  checkedAt: string;
+}
+
+/* -------------------------------------------------------------------------
+   Config
+   ------------------------------------------------------------------------- */
+
+export const THEATERS = [
+  { slug: "amc-lincoln-square-13", name: "AMC Lincoln Square", neighborhood: "Upper West Side" },
+  { slug: "amc-empire-25", name: "AMC Empire 25", neighborhood: "Midtown" },
+  { slug: "amc-kips-bay-15", name: "AMC Kips Bay 15", neighborhood: "Kips Bay" },
+];
+
+export const FORMATS = [
+  { tag: "imax70mm", label: "IMAX 70mm", priority: 1 },
+  { tag: "dolbycinema", label: "Dolby Cinema", priority: 2 },
+  { tag: "imax", label: "IMAX", priority: 3 },
+];
+
 const MARKET_SLUG = "new-york-city";
-const FORMAT_TAG = "imax70mm";
 const MOVIE_SLUG = "project-hail-mary-76779";
 
 const USER_AGENT =
@@ -47,8 +76,12 @@ export function formatDateNice(dateStr: string): string {
   });
 }
 
-async function fetchPage(date: string): Promise<string | null> {
-  const url = `https://www.amctheatres.com/movie-theatres/${MARKET_SLUG}/${THEATER_SLUG}/showtimes?date=${date}`;
+/* -------------------------------------------------------------------------
+   Fetch
+   ------------------------------------------------------------------------- */
+
+async function fetchPage(date: string, theaterSlug: string): Promise<string | null> {
+  const url = `https://www.amctheatres.com/movie-theatres/${MARKET_SLUG}/${theaterSlug}/showtimes?date=${date}`;
   try {
     const resp = await fetch(url, {
       headers: {
@@ -59,36 +92,45 @@ async function fetchPage(date: string): Promise<string | null> {
       signal: AbortSignal.timeout(30000),
     });
     if (!resp.ok) {
-      console.error(`HTTP ${resp.status} for ${date}`);
+      console.error(`HTTP ${resp.status} for ${theaterSlug}/${date}`);
       return null;
     }
     return await resp.text();
   } catch (e) {
-    console.error(`Fetch error for ${date}:`, e);
+    console.error(`Fetch error for ${theaterSlug}/${date}:`, e);
     return null;
   }
 }
 
+/* -------------------------------------------------------------------------
+   Parse
+   ------------------------------------------------------------------------- */
+
 /**
- * Parse IMAX 70mm showtimes from AMC's SSR HTML.
+ * Extract showtimes for a given format tag from AMC's SSR HTML.
  *
  * The HTML contains anchor tags like:
  *   <a aria-describedby="...imax70mm..." id="140840268" href="/showtimes/140840268">
- *     11:00<!-- -->am<!-- --> <span class="sr-only">UP TO 15% OFF, Almost Full</span>
- *   </a>
+ *     11:00<!-- -->am
  *
- * Status is derived from the sr-only span text.
+ * For standard IMAX (tag="imax"), we exclude IMAX 70mm entries.
  */
-function extractImax70mmShowtimes(html: string): Showtime[] {
+function extractFormatShowtimes(html: string, formatTag: string): Showtime[] {
   const showtimes: Showtime[] = [];
   const seen = new Set<string>();
+  const isStandardImax = formatTag === "imax";
 
-  // Match anchor tags that have imax70mm in their aria-describedby
   const anchorRegex =
-    /<a[^>]+aria-describedby="([^"]*imax70mm[^"]*)"[^>]*id="(\d+)"[^>]*href="\/showtimes\/(\d+)"[^>]*>([\d:]+)<!--\s*-->(am|pm)/gi;
+    /<a[^>]+aria-describedby="([^"]*)"[^>]*id="(\d+)"[^>]*href="\/showtimes\/(\d+)"[^>]*>([\d:]+)<!--\s*-->(am|pm)/gi;
 
   let match: RegExpExecArray | null;
   while ((match = anchorRegex.exec(html)) !== null) {
+    const describedBy = match[1].toLowerCase();
+
+    if (!describedBy.includes(formatTag)) continue;
+    // Standard IMAX should not match IMAX 70mm entries
+    if (isStandardImax && describedBy.includes("imax70mm")) continue;
+
     const id = match[3];
     const time = match[4];
     const amPm = match[5].toUpperCase();
@@ -96,7 +138,7 @@ function extractImax70mmShowtimes(html: string): Showtime[] {
     if (seen.has(id)) continue;
     seen.add(id);
 
-    // Look for sr-only span in the next 200 chars for status
+    // Look for sr-only span in the next 250 chars for status
     const afterPos = match.index + match[0].length;
     const afterChunk = html.slice(afterPos, afterPos + 250);
     const srMatch = afterChunk.match(
@@ -136,8 +178,17 @@ function extractImax70mmShowtimes(html: string): Showtime[] {
   });
 }
 
-export async function checkDate(date: string): Promise<DateResult> {
-  const html = await fetchPage(date);
+/* -------------------------------------------------------------------------
+   Public API
+   ------------------------------------------------------------------------- */
+
+/** Check a single date at a specific theater+format (backward-compat defaults). */
+export async function checkDate(
+  date: string,
+  theaterSlug = "amc-lincoln-square-13",
+  formatTag = "imax70mm"
+): Promise<DateResult> {
+  const html = await fetchPage(date, theaterSlug);
   if (!html) {
     return { date, available: false, showtimes: [], error: "Fetch failed" };
   }
@@ -146,11 +197,11 @@ export async function checkDate(date: string): Promise<DateResult> {
     return { date, available: false, showtimes: [] };
   }
 
-  if (!html.toLowerCase().includes(FORMAT_TAG)) {
+  if (!html.toLowerCase().includes(formatTag)) {
     return { date, available: false, showtimes: [] };
   }
 
-  const showtimes = extractImax70mmShowtimes(html);
+  const showtimes = extractFormatShowtimes(html, formatTag);
   return {
     date,
     available: showtimes.length > 0,
@@ -158,17 +209,70 @@ export async function checkDate(date: string): Promise<DateResult> {
   };
 }
 
-export async function checkAllDates(): Promise<StatusResult> {
+/** Check all dates for a single theater+format (backward-compat). */
+export async function checkAllDates(
+  theaterSlug = "amc-lincoln-square-13",
+  formatTag = "imax70mm"
+): Promise<StatusResult> {
   const results: Record<string, DateResult> = {};
 
   for (const date of TARGET_DATES) {
-    results[date] = await checkDate(date);
-    // Polite delay between requests
+    results[date] = await checkDate(date, theaterSlug, formatTag);
     await new Promise((r) => setTimeout(r, 1000));
   }
 
   return {
     dates: results,
+    checkedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Fan out across all THEATERS × TARGET_DATES, fetching each page ONCE
+ * and extracting all FORMATS from the same HTML.
+ * Adds 200ms delay between page fetches to avoid hammering AMC.
+ */
+export async function checkAllTheatersAndFormats(): Promise<MultiStatusResult> {
+  const theaterResults: Record<string, TheaterResult> = {};
+
+  for (const theater of THEATERS) {
+    theaterResults[theater.slug] = {
+      name: theater.name,
+      neighborhood: theater.neighborhood,
+      formats: {},
+    };
+
+    // Initialize format containers
+    for (const format of FORMATS) {
+      theaterResults[theater.slug].formats[format.tag] = { dates: {} };
+    }
+
+    // Fetch each date page ONCE, extract all formats from the same HTML
+    for (const date of TARGET_DATES) {
+      const html = await fetchPage(date, theater.slug);
+
+      for (const format of FORMATS) {
+        const container = theaterResults[theater.slug].formats[format.tag].dates;
+
+        if (!html) {
+          container[date] = { date, available: false, showtimes: [], error: "Fetch failed" };
+        } else if (!html.includes(MOVIE_SLUG)) {
+          container[date] = { date, available: false, showtimes: [] };
+        } else if (!html.toLowerCase().includes(format.tag)) {
+          container[date] = { date, available: false, showtimes: [] };
+        } else {
+          const showtimes = extractFormatShowtimes(html, format.tag);
+          container[date] = { date, available: showtimes.length > 0, showtimes };
+        }
+      }
+
+      // Polite delay between page fetches (200ms)
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+
+  return {
+    theaters: theaterResults,
     checkedAt: new Date().toISOString(),
   };
 }

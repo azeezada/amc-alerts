@@ -20,8 +20,18 @@ interface DateResult {
   error?: string;
 }
 
-interface StatusResponse {
+interface TheaterFormatData {
   dates: Record<string, DateResult>;
+}
+
+interface TheaterData {
+  name: string;
+  neighborhood: string;
+  formats: Record<string, TheaterFormatData>;
+}
+
+interface MultiStatusResponse {
+  theaters: Record<string, TheaterData>;
   checkedAt: string;
   cached?: boolean;
   error?: string;
@@ -35,6 +45,18 @@ const TARGET_DATES = [
   "2026-04-05",
 ];
 
+const THEATER_LIST = [
+  { slug: "amc-lincoln-square-13", name: "AMC Lincoln Square", neighborhood: "Upper West Side" },
+  { slug: "amc-empire-25", name: "AMC Empire 25", neighborhood: "Midtown" },
+  { slug: "amc-kips-bay-15", name: "AMC Kips Bay 15", neighborhood: "Kips Bay" },
+];
+
+const FORMAT_LIST = [
+  { tag: "imax70mm", label: "IMAX 70mm", priority: 1 },
+  { tag: "dolbycinema", label: "Dolby Cinema", priority: 2 },
+  { tag: "imax", label: "IMAX", priority: 3 },
+];
+
 /* =========================================================================
    Helpers
    ========================================================================= */
@@ -45,6 +67,25 @@ function formatDateNice(dateStr: string): { weekday: string; date: string } {
     weekday: d.toLocaleDateString("en-US", { weekday: "long" }),
     date: d.toLocaleDateString("en-US", { month: "long", day: "numeric" }),
   };
+}
+
+/** Find the best theater+format combo that has any availability. */
+function findBestAvailable(
+  theaters: Record<string, TheaterData> | undefined
+): { theaterSlug: string; formatTag: string } | null {
+  if (!theaters) return null;
+  // Priority: IMAX 70mm > Dolby > IMAX, then alphabetical by theater
+  for (const format of FORMAT_LIST) {
+    for (const theater of THEATER_LIST) {
+      const t = theaters[theater.slug];
+      if (!t) continue;
+      const f = t.formats[format.tag];
+      if (!f) continue;
+      const hasAny = Object.values(f.dates).some((d) => d.available);
+      if (hasAny) return { theaterSlug: theater.slug, formatTag: format.tag };
+    }
+  }
+  return null;
 }
 
 /* =========================================================================
@@ -100,8 +141,11 @@ function Countdown() {
     { value: timeLeft.seconds, label: "Sec" },
   ];
 
-  const isReleased = timeLeft.days === 0 && timeLeft.hours === 0 &&
-    timeLeft.minutes === 0 && timeLeft.seconds === 0;
+  const isReleased =
+    timeLeft.days === 0 &&
+    timeLeft.hours === 0 &&
+    timeLeft.minutes === 0 &&
+    timeLeft.seconds === 0;
 
   if (isReleased) {
     return (
@@ -122,12 +166,7 @@ function Countdown() {
       >
         <span
           className="pulse-dot"
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: "var(--success)",
-          }}
+          style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success)" }}
         />
         Now in theatres
       </div>
@@ -148,13 +187,7 @@ function Countdown() {
       >
         Release date countdown
       </div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: "var(--space-lg)",
-        }}
-      >
+      <div style={{ display: "flex", justifyContent: "center", gap: "var(--space-lg)" }}>
         {units.map(({ value, label }) => (
           <div key={label} style={{ textAlign: "center" }}>
             <div
@@ -268,10 +301,7 @@ function ShowtimeSkeleton() {
         <div
           key={i}
           className="skeleton"
-          style={{
-            height: 48,
-            animationDelay: `${i * 150}ms`,
-          }}
+          style={{ height: 48, animationDelay: `${i * 150}ms` }}
         />
       ))}
     </div>
@@ -279,7 +309,7 @@ function ShowtimeSkeleton() {
 }
 
 /* =========================================================================
-   Date Card — Ticket-style with notches
+   Date Card
    ========================================================================= */
 function DateCard({
   date,
@@ -311,7 +341,6 @@ function DateCard({
         } as React.CSSProperties
       }
     >
-      {/* Release date indicator */}
       {isReleaseDate && (
         <div
           style={{
@@ -325,7 +354,6 @@ function DateCard({
         />
       )}
 
-      {/* Date header */}
       <div
         style={{
           display: "flex",
@@ -406,7 +434,6 @@ function DateCard({
         )}
       </div>
 
-      {/* Dashed divider — ticket perforation */}
       <div
         style={{
           borderTop: "1px dashed var(--border-subtle)",
@@ -415,7 +442,6 @@ function DateCard({
         }}
       />
 
-      {/* Showtimes */}
       {isLoading ? (
         <ShowtimeSkeleton />
       ) : hasShowtimes ? (
@@ -485,15 +511,12 @@ function DateCard({
               lineHeight: "var(--leading-normal)",
             }}
           >
-            No IMAX 70mm tickets yet
+            No tickets yet for this format
           </div>
           <button
             onClick={() => onNotify(date)}
             className="btn-ghost"
-            style={{
-              borderColor: "var(--accent)",
-              color: "var(--accent)",
-            }}
+            style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
           >
             Notify me when available
           </button>
@@ -504,10 +527,202 @@ function DateCard({
 }
 
 /* =========================================================================
+   Theater Tabs
+   ========================================================================= */
+function TheaterTabs({
+  selected,
+  onChange,
+  theaters,
+  bestCombo,
+}: {
+  selected: string;
+  onChange: (slug: string) => void;
+  theaters: Record<string, TheaterData> | undefined;
+  bestCombo: { theaterSlug: string; formatTag: string } | null;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: "var(--space-xs)",
+        flexWrap: "wrap",
+        marginBottom: "var(--space-base)",
+      }}
+      role="tablist"
+      aria-label="Theater selector"
+    >
+      {THEATER_LIST.map((theater) => {
+        const isSelected = selected === theater.slug;
+        const hasAny = theaters?.[theater.slug]
+          ? Object.values(theaters[theater.slug].formats).some((f) =>
+              Object.values(f.dates).some((d) => d.available)
+            )
+          : false;
+        const isBest = bestCombo?.theaterSlug === theater.slug;
+
+        return (
+          <button
+            key={theater.slug}
+            role="tab"
+            aria-selected={isSelected}
+            onClick={() => onChange(theater.slug)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "var(--space-sm)",
+              padding: "var(--space-sm) var(--space-base)",
+              borderRadius: 8,
+              border: `1.5px solid ${isSelected ? "var(--accent)" : "var(--border-subtle)"}`,
+              background: isSelected ? "var(--bg-elevated)" : "transparent",
+              color: isSelected ? "var(--text-primary)" : "var(--text-secondary)",
+              fontFamily: "inherit",
+              fontSize: "var(--text-sm)",
+              fontWeight: isSelected ? 700 : 500,
+              cursor: "pointer",
+              transition: "all var(--dur-fast) var(--ease-default)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {theater.name}
+            <span
+              style={{
+                fontSize: "var(--text-xs)",
+                color: "var(--text-tertiary)",
+                fontWeight: 400,
+              }}
+            >
+              {theater.neighborhood}
+            </span>
+            {isBest && hasAny && (
+              <span
+                style={{
+                  background: "var(--accent)",
+                  color: "oklch(98% 0.005 75)",
+                  fontSize: 10,
+                  fontWeight: 800,
+                  padding: "1px 6px",
+                  borderRadius: 3,
+                  letterSpacing: "0.5px",
+                  lineHeight: 1.6,
+                }}
+              >
+                BEST
+              </span>
+            )}
+            {hasAny && !isBest && (
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  background: "var(--success)",
+                  flexShrink: 0,
+                }}
+              />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* =========================================================================
+   Format Pills
+   ========================================================================= */
+function FormatPills({
+  selected,
+  onChange,
+  theaterData,
+  bestCombo,
+  theaterSlug,
+}: {
+  selected: string;
+  onChange: (tag: string) => void;
+  theaterData: TheaterData | undefined;
+  bestCombo: { theaterSlug: string; formatTag: string } | null;
+  theaterSlug: string;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: "var(--space-xs)",
+        flexWrap: "wrap",
+        marginBottom: "var(--space-lg)",
+      }}
+      role="group"
+      aria-label="Format selector"
+    >
+      {FORMAT_LIST.map((format) => {
+        const isSelected = selected === format.tag;
+        const hasAny = theaterData?.formats[format.tag]
+          ? Object.values(theaterData.formats[format.tag].dates).some((d) => d.available)
+          : false;
+        const isBest =
+          bestCombo?.theaterSlug === theaterSlug && bestCombo?.formatTag === format.tag;
+
+        return (
+          <button
+            key={format.tag}
+            onClick={() => onChange(format.tag)}
+            aria-pressed={isSelected}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "var(--space-xs)",
+              padding: "6px 14px",
+              borderRadius: 100,
+              border: `1.5px solid ${isSelected ? "var(--accent)" : "var(--border-subtle)"}`,
+              background: isSelected ? "var(--accent)" : "transparent",
+              color: isSelected ? "oklch(98% 0.005 75)" : "var(--text-secondary)",
+              fontFamily: "inherit",
+              fontSize: "var(--text-xs)",
+              fontWeight: 700,
+              cursor: "pointer",
+              letterSpacing: "0.5px",
+              transition: "all var(--dur-fast) var(--ease-default)",
+            }}
+          >
+            {format.label}
+            {isBest && hasAny && (
+              <span
+                style={{
+                  background: isSelected ? "rgba(0,0,0,0.2)" : "var(--accent)",
+                  color: "oklch(98% 0.005 75)",
+                  fontSize: 9,
+                  fontWeight: 900,
+                  padding: "1px 5px",
+                  borderRadius: 3,
+                  letterSpacing: "0.5px",
+                }}
+              >
+                BEST
+              </span>
+            )}
+            {hasAny && (
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: isSelected ? "rgba(255,255,255,0.7)" : "var(--success)",
+                  flexShrink: 0,
+                }}
+              />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* =========================================================================
    Main Page
    ========================================================================= */
 export default function Home() {
-  const [status, setStatus] = useState<StatusResponse | null>(null);
+  const [status, setStatus] = useState<MultiStatusResponse | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [email, setEmail] = useState("");
   const [selectedDates, setSelectedDates] = useState<string[]>([...TARGET_DATES]);
@@ -519,10 +734,14 @@ export default function Home() {
   const [lastChecked, setLastChecked] = useState<string>("");
   const [notifyDate, setNotifyDate] = useState<string | null>(null);
 
+  // Theater + format selection
+  const [selectedTheater, setSelectedTheater] = useState(THEATER_LIST[0].slug);
+  const [selectedFormat, setSelectedFormat] = useState(FORMAT_LIST[0].tag);
+
   const fetchStatus = useCallback(async () => {
     try {
       const resp = await fetch("/api/status");
-      const data = (await resp.json()) as StatusResponse;
+      const data = (await resp.json()) as MultiStatusResponse;
       setStatus(data);
       const now = new Date();
       setLastChecked(
@@ -540,6 +759,27 @@ export default function Home() {
     const interval = setInterval(fetchStatus, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [fetchStatus]);
+
+  const bestCombo = findBestAvailable(status?.theaters);
+
+  // Auto-select the best combo once data loads
+  useEffect(() => {
+    if (bestCombo) {
+      setSelectedTheater(bestCombo.theaterSlug);
+      setSelectedFormat(bestCombo.formatTag);
+    }
+  }, [bestCombo?.theaterSlug, bestCombo?.formatTag]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const currentTheaterData = status?.theaters[selectedTheater];
+  const currentFormatData = currentTheaterData?.formats[selectedFormat];
+
+  const anyAvailable = status?.theaters
+    ? Object.values(status.theaters).some((t) =>
+        Object.values(t.formats).some((f) =>
+          Object.values(f.dates).some((d) => d.available)
+        )
+      )
+    : false;
 
   const handleNotify = (date: string) => {
     setNotifyDate(date);
@@ -577,50 +817,34 @@ export default function Home() {
         success: data.success || false,
         message: data.message || data.error || "Something went wrong",
       });
-      if (data.success) {
-        setEmail("");
-      }
+      if (data.success) setEmail("");
     } catch {
-      setSubmitResult({
-        success: false,
-        message: "Network error — please try again.",
-      });
+      setSubmitResult({ success: false, message: "Network error — please try again." });
     } finally {
       setSubmitting(false);
     }
   };
 
-  const anyAvailable = status
-    ? Object.values(status.dates).some((d) => d.available)
-    : false;
+  const theaterMeta = THEATER_LIST.find((t) => t.slug === selectedTheater);
+  const formatMeta = FORMAT_LIST.find((f) => f.tag === selectedFormat);
 
   return (
     <div style={{ minHeight: "100vh" }}>
       <ThemeToggle />
 
-      {/* Film strip top accent */}
-      <div
-        className="film-strip-border"
-        style={{ background: "var(--accent)" }}
-      />
+      <div className="film-strip-border" style={{ background: "var(--accent)" }} />
 
       {/* ===== HERO ===== */}
       <header
         className="film-grain light-leak"
         style={{
-          background: `linear-gradient(
-            180deg,
-            var(--bg-base) 0%,
-            var(--bg-surface) 40%,
-            var(--bg-base) 100%
-          )`,
+          background: `linear-gradient(180deg, var(--bg-base) 0%, var(--bg-surface) 40%, var(--bg-base) 100%)`,
           padding: "var(--space-3xl) var(--space-lg) var(--space-2xl)",
           textAlign: "center",
           position: "relative",
           overflow: "hidden",
         }}
       >
-        {/* Radial glow */}
         <div
           style={{
             position: "absolute",
@@ -637,14 +861,8 @@ export default function Home() {
         />
 
         <div
-          style={{
-            position: "relative",
-            zIndex: 2,
-            maxWidth: 700,
-            margin: "0 auto",
-          }}
+          style={{ position: "relative", zIndex: 2, maxWidth: 700, margin: "0 auto" }}
         >
-          {/* Format badge */}
           <div
             className="hero-enter"
             style={{
@@ -665,11 +883,10 @@ export default function Home() {
                 letterSpacing: "2.5px",
               }}
             >
-              IMAX® 70MM FILM
+              NYC TICKET ALERTS
             </span>
           </div>
 
-          {/* Movie poster placeholder */}
           <div
             className="hero-enter hero-enter-delay-1"
             style={{
@@ -677,11 +894,7 @@ export default function Home() {
               height: 195,
               margin: "0 auto var(--space-lg)",
               borderRadius: 8,
-              background: `linear-gradient(
-                135deg,
-                var(--bg-elevated) 0%,
-                var(--bg-surface) 100%
-              )`,
+              background: `linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-surface) 100%)`,
               border: "1px solid var(--border-subtle)",
               display: "flex",
               flexDirection: "column",
@@ -711,7 +924,6 @@ export default function Home() {
             </span>
           </div>
 
-          {/* Title */}
           <h1
             className="hero-enter hero-enter-delay-2"
             style={{
@@ -726,7 +938,6 @@ export default function Home() {
             Project Hail Mary
           </h1>
 
-          {/* Subtitle */}
           <p
             className="font-display hero-enter hero-enter-delay-2"
             style={{
@@ -737,40 +948,11 @@ export default function Home() {
               fontStyle: "italic",
             }}
           >
-            The IMAX 70mm Experience
+            Premium Format Showtimes · NYC
           </p>
 
-          {/* Location */}
-          <div
-            className="hero-enter hero-enter-delay-3"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "var(--space-sm)",
-              color: "var(--text-tertiary)",
-              fontSize: "var(--text-sm)",
-            }}
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-              <circle cx="12" cy="10" r="3" />
-            </svg>
-            <span>AMC Lincoln Square 13 · New York City</span>
-          </div>
-
-          {/* Countdown */}
           <Countdown />
 
-          {/* Availability indicator */}
           {!loadingStatus && (
             <div
               className="hero-enter hero-enter-delay-4"
@@ -779,20 +961,14 @@ export default function Home() {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "var(--space-sm)",
-                background: anyAvailable
-                  ? "var(--success-subtle)"
-                  : "var(--bg-surface)",
+                background: anyAvailable ? "var(--success-subtle)" : "var(--bg-surface)",
                 border: "1px solid",
-                borderColor: anyAvailable
-                  ? "var(--success)"
-                  : "var(--border-subtle)",
+                borderColor: anyAvailable ? "var(--success)" : "var(--border-subtle)",
                 borderRadius: 100,
                 padding: "var(--space-sm) var(--space-base)",
                 fontSize: "var(--text-sm)",
                 fontWeight: 600,
-                color: anyAvailable
-                  ? "var(--success)"
-                  : "var(--text-tertiary)",
+                color: anyAvailable ? "var(--success)" : "var(--text-tertiary)",
               }}
             >
               <span
@@ -801,30 +977,20 @@ export default function Home() {
                   width: 8,
                   height: 8,
                   borderRadius: "50%",
-                  background: anyAvailable
-                    ? "var(--success)"
-                    : "var(--text-tertiary)",
+                  background: anyAvailable ? "var(--success)" : "var(--text-tertiary)",
                   flexShrink: 0,
                 }}
               />
-              {anyAvailable
-                ? "Tickets available now"
-                : "Tickets not yet on sale"}
+              {anyAvailable ? "Tickets available now" : "Tickets not yet on sale"}
             </div>
           )}
         </div>
       </header>
 
       {/* ===== MAIN CONTENT ===== */}
-      <main
-        style={{
-          maxWidth: 900,
-          margin: "0 auto",
-          padding: "0 var(--space-lg)",
-        }}
-      >
-        {/* Availability section */}
+      <main style={{ maxWidth: 960, margin: "0 auto", padding: "0 var(--space-lg)" }}>
         <section style={{ padding: "var(--space-2xl) 0 var(--space-xl)" }}>
+          {/* Section header */}
           <div
             style={{
               display: "flex",
@@ -853,7 +1019,7 @@ export default function Home() {
                   fontSize: "var(--text-sm)",
                 }}
               >
-                IMAX 70mm showtimes at AMC Lincoln Square 13
+                {formatMeta?.label ?? selectedFormat} · {theaterMeta?.name ?? selectedTheater}
               </p>
             </div>
             {lastChecked && (
@@ -886,7 +1052,24 @@ export default function Home() {
             )}
           </div>
 
-          {/* Loading state with projector spinner */}
+          {/* Theater tabs */}
+          <TheaterTabs
+            selected={selectedTheater}
+            onChange={setSelectedTheater}
+            theaters={status?.theaters}
+            bestCombo={bestCombo}
+          />
+
+          {/* Format pills */}
+          <FormatPills
+            selected={selectedFormat}
+            onChange={setSelectedFormat}
+            theaterData={currentTheaterData}
+            bestCombo={bestCombo}
+            theaterSlug={selectedTheater}
+          />
+
+          {/* Loading spinner */}
           {loadingStatus && !status && (
             <div
               style={{
@@ -920,9 +1103,9 @@ export default function Home() {
           >
             {TARGET_DATES.map((date, i) => (
               <DateCard
-                key={date}
+                key={`${selectedTheater}-${selectedFormat}-${date}`}
                 date={date}
-                result={status?.dates[date]}
+                result={currentFormatData?.dates[date]}
                 index={i}
                 onNotify={handleNotify}
               />
@@ -980,13 +1163,10 @@ export default function Home() {
                   lineHeight: "var(--leading-normal)",
                 }}
               >
-                We&apos;ll email you the moment IMAX 70mm tickets drop.
+                We&apos;ll email you the moment tickets drop.
                 No spam — just one alert when tickets become available.
               </p>
-              <button
-                onClick={() => setSubmitResult(null)}
-                className="btn-ghost"
-              >
+              <button onClick={() => setSubmitResult(null)} className="btn-ghost">
                 Add another email
               </button>
             </div>
@@ -1012,8 +1192,7 @@ export default function Home() {
                     lineHeight: "var(--leading-normal)",
                   }}
                 >
-                  Enter your email and we&apos;ll alert you the instant IMAX
-                  70mm tickets go on sale.
+                  Enter your email and we&apos;ll alert you the instant tickets go on sale.
                   {notifyDate && (
                     <span style={{ color: "var(--accent)" }}>
                       {" "}
@@ -1069,7 +1248,6 @@ export default function Home() {
                   </button>
                 </div>
 
-                {/* Date selection */}
                 <fieldset style={{ border: "none", margin: 0, padding: 0 }}>
                   <legend
                     style={{
@@ -1083,13 +1261,7 @@ export default function Home() {
                   >
                     Notify me for
                   </legend>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: "var(--space-sm)",
-                    }}
-                  >
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-sm)" }}>
                     <label
                       style={{
                         display: "flex",
@@ -1105,9 +1277,7 @@ export default function Home() {
                         type="checkbox"
                         checked={selectedDates.length === TARGET_DATES.length}
                         onChange={(e) => {
-                          setSelectedDates(
-                            e.target.checked ? [...TARGET_DATES] : []
-                          );
+                          setSelectedDates(e.target.checked ? [...TARGET_DATES] : []);
                         }}
                       />
                       All dates
@@ -1124,18 +1294,12 @@ export default function Home() {
                             gap: 6,
                             cursor: "pointer",
                             fontSize: "var(--text-sm)",
-                            color: isSelected
-                              ? "var(--text-primary)"
-                              : "var(--text-secondary)",
-                            background: isSelected
-                              ? "var(--bg-elevated)"
-                              : "transparent",
+                            color: isSelected ? "var(--text-primary)" : "var(--text-secondary)",
+                            background: isSelected ? "var(--bg-elevated)" : "transparent",
                             padding: "var(--space-xs) var(--space-sm)",
                             borderRadius: 4,
                             border: `1px solid ${
-                              isSelected
-                                ? "var(--border-default)"
-                                : "transparent"
+                              isSelected ? "var(--border-default)" : "transparent"
                             }`,
                             transition: `all var(--dur-fast) var(--ease-default)`,
                           }}
@@ -1177,14 +1341,7 @@ export default function Home() {
             padding: "var(--space-xl) 0 var(--space-2xl)",
           }}
         >
-          {/* Film strip divider */}
-          <div
-            className="film-strip-border"
-            style={{
-              marginBottom: "var(--space-xl)",
-              opacity: 0.4,
-            }}
-          />
+          <div className="film-strip-border" style={{ marginBottom: "var(--space-xl)", opacity: 0.4 }} />
 
           <div
             style={{
@@ -1215,8 +1372,8 @@ export default function Home() {
                   maxWidth: "40ch",
                 }}
               >
-                We check AMC&apos;s website every 15 minutes. When IMAX 70mm
-                tickets appear, we email you with direct booking links.
+                We check AMC&apos;s website every 15 minutes across 3 theaters and 3 formats.
+                When tickets appear, we email you with direct booking links.
               </p>
             </div>
 
@@ -1231,7 +1388,7 @@ export default function Home() {
                   letterSpacing: "1.5px",
                 }}
               >
-                What to expect
+                Formats covered
               </h3>
               <ul
                 style={{
@@ -1243,10 +1400,9 @@ export default function Home() {
                   lineHeight: 2.2,
                 }}
               >
-                <li>Checks every 15 minutes</li>
-                <li>One email per ticket drop</li>
-                <li>No spam, ever</li>
-                <li>Unsubscribe any time</li>
+                <li>IMAX 70mm (highest priority)</li>
+                <li>Dolby Cinema</li>
+                <li>Standard IMAX</li>
               </ul>
             </div>
 
@@ -1279,14 +1435,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Bottom film strip */}
-          <div
-            className="film-strip-border"
-            style={{
-              marginTop: "var(--space-xl)",
-              opacity: 0.4,
-            }}
-          />
+          <div className="film-strip-border" style={{ marginTop: "var(--space-xl)", opacity: 0.4 }} />
         </footer>
       </main>
     </div>

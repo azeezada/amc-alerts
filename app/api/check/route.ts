@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkAllDates, DateResult, TARGET_DATES } from "@/lib/scraper";
+import { checkAllTheatersAndFormats, DateResult, TARGET_DATES, THEATERS, FORMATS } from "@/lib/scraper";
 import { buildEmailHtml, buildEmailText } from "@/lib/email";
 import { getCfEnv, type D1Database } from "@/lib/cf-env";
 
 export const runtime = "edge";
 
-
 interface CacheRow {
-  date: string;
+  cache_key: string;
   data: string;
 }
 
 interface SubscriberRow {
   email: string;
   dates: string;
+}
+
+function makeKey(theaterSlug: string, formatTag: string, date: string) {
+  return `${theaterSlug}__${formatTag}__${date}`;
 }
 
 async function sendEmailViaResend(
@@ -33,7 +36,7 @@ async function sendEmailViaResend(
     body: JSON.stringify({
       from: "IMAX Alerts <alerts@churnrecovery.com>",
       to,
-      subject: "🎬 IMAX 70mm Tickets Available — Project Hail Mary",
+      subject: "🎬 Tickets Available — Project Hail Mary",
       html,
       text,
     }),
@@ -66,60 +69,84 @@ async function runCheck(_request: NextRequest) {
   const resendApiKey: string | undefined = env.RESEND_API_KEY;
 
   const log: string[] = [];
-  const logLine = (msg: string) => { console.log(msg); log.push(msg); };
+  const logLine = (msg: string) => {
+    console.log(msg);
+    log.push(msg);
+  };
 
-  logLine("=== AMC Check Started ===");
+  logLine("=== AMC Multi-Theater Check Started ===");
+  logLine(`Theaters: ${THEATERS.map((t) => t.slug).join(", ")}`);
+  logLine(`Formats: ${FORMATS.map((f) => f.tag).join(", ")}`);
 
   try {
-    const result = await checkAllDates();
-    logLine(`Fetched ${TARGET_DATES.length} dates`);
+    const result = await checkAllTheatersAndFormats();
+    logLine(`Fetched ${THEATERS.length} theaters × ${FORMATS.length} formats × ${TARGET_DATES.length} dates`);
 
+    // Collect newly-available date results across all theater+format combos
     const newlyAvailable: DateResult[] = [];
 
-    for (const [date, dateResult] of Object.entries(result.dates)) {
-      if (!dateResult.available || dateResult.showtimes.length === 0) {
-        logLine(`${date}: No IMAX 70mm available`);
-        continue;
-      }
+    for (const [theaterSlug, theaterData] of Object.entries(result.theaters)) {
+      for (const [formatTag, formatData] of Object.entries(theaterData.formats)) {
+        for (const [date, dateResult] of Object.entries(formatData.dates)) {
+          if (!dateResult.available || dateResult.showtimes.length === 0) {
+            logLine(`${theaterSlug}/${formatTag}/${date}: No tickets`);
+            continue;
+          }
 
-      logLine(`${date}: ${dateResult.showtimes.length} showtime(s) found`);
+          logLine(`${theaterSlug}/${formatTag}/${date}: ${dateResult.showtimes.length} showtime(s)`);
 
-      if (db) {
-        const cached = await db
-          .prepare("SELECT data FROM showtime_cache WHERE date = ?")
-          .bind(date)
-          .first<CacheRow>();
+          if (db) {
+            const key = makeKey(theaterSlug, formatTag, date);
+            let cached: CacheRow | null = null;
+            try {
+              cached = await db
+                .prepare("SELECT cache_key, data FROM showtime_cache_v2 WHERE cache_key = ?")
+                .bind(key)
+                .first<CacheRow>();
+            } catch (_) {
+              // Table may not exist yet
+            }
 
-        if (!cached) {
-          logLine(`  → NEW DATE (not in cache)`);
-          newlyAvailable.push(dateResult);
-        } else {
-          const prevData = JSON.parse(cached.data) as DateResult;
-          if (!prevData.available || prevData.showtimes.length === 0) {
-            logLine(`  → NEW (was unavailable before)`);
-            newlyAvailable.push(dateResult);
-          } else {
-            const prevIds = new Set(prevData.showtimes.map((s) => s.id));
-            const newIds = dateResult.showtimes.filter((s) => !prevIds.has(s.id));
-            if (newIds.length > 0) {
-              logLine(`  → ${newIds.length} new showtime(s) added`);
+            if (!cached) {
+              logLine(`  → NEW (not in cache)`);
               newlyAvailable.push(dateResult);
             } else {
-              logLine(`  → Already known, no changes`);
+              const prevData = JSON.parse(cached.data) as DateResult;
+              if (!prevData.available || prevData.showtimes.length === 0) {
+                logLine(`  → NEW (was unavailable before)`);
+                newlyAvailable.push(dateResult);
+              } else {
+                const prevIds = new Set(prevData.showtimes.map((s) => s.id));
+                const newIds = dateResult.showtimes.filter((s) => !prevIds.has(s.id));
+                if (newIds.length > 0) {
+                  logLine(`  → ${newIds.length} new showtime(s) added`);
+                  newlyAvailable.push(dateResult);
+                } else {
+                  logLine(`  → Already known, no changes`);
+                }
+              }
             }
+
+            // Update cache
+            try {
+              const key2 = makeKey(theaterSlug, formatTag, date);
+              await db
+                .prepare(
+                  "INSERT OR REPLACE INTO showtime_cache_v2 (cache_key, data, checked_at) VALUES (?, ?, datetime('now'))"
+                )
+                .bind(key2, JSON.stringify(dateResult))
+                .run();
+            } catch (_) {
+              // Ignore cache write failures
+            }
+          } else {
+            newlyAvailable.push(dateResult);
           }
         }
-
-        await db
-          .prepare("INSERT OR REPLACE INTO showtime_cache (date, data, checked_at) VALUES (?, ?, datetime('now'))")
-          .bind(date, JSON.stringify(dateResult))
-          .run();
-      } else {
-        newlyAvailable.push(dateResult);
       }
     }
 
-    logLine(`Newly available dates: ${newlyAvailable.length}`);
+    logLine(`Newly available: ${newlyAvailable.length} showtime entries`);
 
     if (newlyAvailable.length === 0) {
       return NextResponse.json({ log, notified: 0, newDates: [] });
@@ -127,12 +154,22 @@ async function runCheck(_request: NextRequest) {
 
     if (!db) {
       logLine("[DEV] No DB — skipping notifications");
-      return NextResponse.json({ log, notified: 0, newDates: newlyAvailable.map((d) => d.date), devMode: true });
+      return NextResponse.json({
+        log,
+        notified: 0,
+        newDates: newlyAvailable.map((d) => d.date),
+        devMode: true,
+      });
     }
 
     if (!resendApiKey) {
       logLine("No RESEND_API_KEY set — skipping email");
-      return NextResponse.json({ log, notified: 0, newDates: newlyAvailable.map((d) => d.date), error: "No RESEND_API_KEY" });
+      return NextResponse.json({
+        log,
+        notified: 0,
+        newDates: newlyAvailable.map((d) => d.date),
+        error: "No RESEND_API_KEY",
+      });
     }
 
     const { results: subscribers } = await db
@@ -153,7 +190,9 @@ async function runCheck(_request: NextRequest) {
       try {
         await sendEmailViaResend(sub.email, relevantDates, resendApiKey);
         await db
-          .prepare("UPDATE subscribers SET notified_at = datetime('now') WHERE email = ?")
+          .prepare(
+            "UPDATE subscribers SET notified_at = datetime('now') WHERE email = ?"
+          )
           .bind(sub.email)
           .run();
         notified++;
@@ -165,7 +204,11 @@ async function runCheck(_request: NextRequest) {
     }
 
     logLine(`=== Done. Notified ${notified} subscribers ===`);
-    return NextResponse.json({ log, notified, newDates: newlyAvailable.map((d) => d.date) });
+    return NextResponse.json({
+      log,
+      notified,
+      newDates: newlyAvailable.map((d) => d.date),
+    });
   } catch (e) {
     logLine(`ERROR: ${e}`);
     return NextResponse.json({ error: String(e), log }, { status: 500 });
