@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
 /* =========================================================================
    Types
@@ -1382,6 +1382,11 @@ export default function Home() {
   const [compareMode, setCompareMode] = useState(false);
   const [subscriberCount, setSubscriberCount] = useState<number | null>(null);
   const [shareMsg, setShareMsg] = useState("");
+  const [subEmail, setSubEmail] = useState("");
+  const [subStatus, setSubStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [subMsg, setSubMsg] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef<HTMLDivElement>(null);
 
   // Fetch subscriber count for social proof
   useEffect(() => {
@@ -1402,6 +1407,60 @@ export default function Home() {
       await navigator.clipboard.writeText(`${text}\n${url}`);
       setShareMsg("Copied to clipboard!");
       setTimeout(() => setShareMsg(""), 2000);
+    }
+  };
+
+  // Load Turnstile widget
+  useEffect(() => {
+    if (step !== "results" || !turnstileRef.current) return;
+    const existingScript = document.querySelector('script[src*="turnstile"]');
+    if (!existingScript) {
+      const script = document.createElement("script");
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      script.async = true;
+      script.onload = () => renderTurnstile();
+      document.head.appendChild(script);
+    } else {
+      renderTurnstile();
+    }
+    function renderTurnstile() {
+      const w = window as any;
+      if (w.turnstile && turnstileRef.current && !turnstileRef.current.hasChildNodes()) {
+        w.turnstile.render(turnstileRef.current, {
+          sitekey: "0x4AAAAAAA" + "BAAAAAAAL_test_only",
+          callback: (token: string) => setTurnstileToken(token),
+          theme: "dark",
+          size: "compact",
+        });
+      }
+    }
+  }, [step]);
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subEmail) return;
+    setSubStatus("loading");
+    try {
+      const resp = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: subEmail,
+          dates: selectedDates,
+          turnstileToken,
+        }),
+      });
+      const data = await resp.json();
+      if (resp.ok && data.success) {
+        setSubStatus("success");
+        setSubMsg(data.message);
+      } else {
+        setSubStatus("error");
+        setSubMsg(data.error || "Something went wrong.");
+      }
+    } catch {
+      setSubStatus("error");
+      setSubMsg("Network error. Please try again.");
     }
   };
 
@@ -1954,6 +2013,48 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* ===== EMAIL SUBSCRIBE ===== */}
+            <div
+              className="card"
+              style={{
+                padding: "var(--space-lg)",
+                marginTop: "var(--space-2xl)",
+                textAlign: "center",
+              }}
+            >
+              <h3 style={{ margin: "0 0 var(--space-sm)", fontSize: 18, fontWeight: 600, color: "var(--text-primary)" }}>
+                Get notified when tickets drop
+              </h3>
+              <p style={{ margin: "0 0 var(--space-base)", fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+                We&apos;ll email you the moment new showtimes become available.
+              </p>
+              {subStatus === "success" ? (
+                <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)" }}>{subMsg}</p>
+              ) : (
+                <form onSubmit={handleSubscribe} style={{ display: "flex", gap: "var(--space-sm)", maxWidth: 480, margin: "0 auto", flexWrap: "wrap" }}>
+                  <input
+                    type="email"
+                    value={subEmail}
+                    onChange={(e) => setSubEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    required
+                    style={{ flex: 1, minWidth: 200 }}
+                  />
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={subStatus === "loading" || !subEmail}
+                  >
+                    {subStatus === "loading" ? "Subscribing..." : "Notify me"}
+                  </button>
+                  <div ref={turnstileRef} style={{ width: "100%", display: "flex", justifyContent: "center", marginTop: "var(--space-sm)" }} />
+                  {subStatus === "error" && (
+                    <p style={{ width: "100%", color: "var(--accent)", fontSize: "var(--text-xs)", margin: "var(--space-sm) 0 0" }}>{subMsg}</p>
+                  )}
+                </form>
+              )}
             </div>
           </section>
         )}

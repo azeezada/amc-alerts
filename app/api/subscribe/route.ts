@@ -14,8 +14,25 @@ export async function POST(request: NextRequest) {
   if (limited) return limited;
 
   try {
-    const body = (await request.json()) as { email?: string; dates?: string[] };
-    const { email, dates } = body;
+    const body = (await request.json()) as { email?: string; dates?: string[]; turnstileToken?: string };
+    const { email, dates, turnstileToken } = body;
+
+    // Verify Turnstile token if provided (skip in dev)
+    if (turnstileToken) {
+      const env = await getCfEnv();
+      const turnstileSecret = (env as any).TURNSTILE_SECRET_KEY;
+      if (turnstileSecret) {
+        const verifyResp = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ secret: turnstileSecret, response: turnstileToken }),
+        });
+        const verifyData = await verifyResp.json() as { success: boolean };
+        if (!verifyData.success) {
+          return NextResponse.json({ error: "Bot verification failed. Please try again." }, { status: 403 });
+        }
+      }
+    }
 
     if (!email || !isValidEmail(email)) {
       return NextResponse.json(
