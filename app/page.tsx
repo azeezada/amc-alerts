@@ -1380,6 +1380,30 @@ export default function Home() {
   const [selectedTheater, setSelectedTheater] = useState("");
   const [selectedFormat, setSelectedFormat] = useState(FORMAT_LIST[0].tag);
   const [compareMode, setCompareMode] = useState(false);
+  const [subscriberCount, setSubscriberCount] = useState<number | null>(null);
+  const [shareMsg, setShareMsg] = useState("");
+
+  // Fetch subscriber count for social proof
+  useEffect(() => {
+    fetch("/api/stats")
+      .then((r) => r.json())
+      .then((data: { subscribers: number }) => setSubscriberCount(data.subscribers))
+      .catch(() => {});
+  }, []);
+
+  const handleShare = async () => {
+    const text = `Check showtimes for ${movieTitle || "movies"} at AMC — track IMAX 70mm, Dolby Cinema & more`;
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: "AMC Showtime Alerts", text, url });
+      } catch { /* user cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      setShareMsg("Copied to clipboard!");
+      setTimeout(() => setShareMsg(""), 2000);
+    }
+  };
 
   // Initialize from URL params or localStorage
   useEffect(() => {
@@ -1752,6 +1776,42 @@ export default function Home() {
                   Change selection
                 </button>
               </div>
+            </div>
+
+            {/* Social proof + Share */}
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-lg)", marginBottom: "var(--space-lg)", flexWrap: "wrap" }}>
+              {subscriberCount !== null && subscriberCount > 0 && (
+                <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
+                  <span style={{ color: "var(--text-secondary)", fontWeight: 700 }}>{subscriberCount}</span>{" "}
+                  {subscriberCount === 1 ? "person" : "people"} watching for tickets
+                </span>
+              )}
+              <button
+                onClick={handleShare}
+                className="btn-ghost"
+                style={{ fontSize: "var(--text-xs)", marginLeft: "auto", position: "relative" }}
+              >
+                Share
+                {shareMsg && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      bottom: "calc(100% + 6px)",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      background: "var(--bg-elevated)",
+                      color: "var(--text-primary)",
+                      padding: "4px 10px",
+                      borderRadius: 4,
+                      fontSize: 11,
+                      whiteSpace: "nowrap",
+                      boxShadow: "var(--shadow-md)",
+                    }}
+                  >
+                    {shareMsg}
+                  </span>
+                )}
+              </button>
             </div>
 
             {compareMode ? (
