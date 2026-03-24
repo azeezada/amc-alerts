@@ -170,46 +170,11 @@ function writeLocalStorage(theaters: string[], movie: string, dates: string[]) {
 }
 
 /* =========================================================================
-   Theme Toggle
-   ========================================================================= */
-function ThemeToggle() {
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    const current = document.documentElement.getAttribute("data-theme");
-    if (current === "light") setTheme("light");
-    else setTheme("dark");
-  }, []);
-
-  const toggle = () => {
-    const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    document.documentElement.setAttribute("data-theme", next);
-    localStorage.setItem("theme", next);
-  };
-
-  if (!mounted) return null;
-
-  return (
-    <button
-      className="theme-toggle"
-      onClick={toggle}
-      aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-      title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-    >
-      {theme === "dark" ? "\u2600" : "\u263E"}
-    </button>
-  );
-}
-
-/* =========================================================================
    Status Badge
    ========================================================================= */
 function StatusBadge({ status }: { status: string }) {
   const config = {
-    Sellable: { cls: "status-sellable", label: "Available", dot: "var(--success)" },
+    Sellable: { cls: "status-sellable", label: "Available", dot: "#FFFFFF" },
     AlmostFull: { cls: "status-almostfull", label: "Almost full", dot: "var(--warning)" },
   } as Record<string, { cls: string; label: string; dot: string }>;
 
@@ -278,8 +243,7 @@ function DateCard({
           padding: "var(--space-lg)",
           position: "relative",
           overflow: "hidden",
-          borderColor: hasShowtimes ? "var(--accent)" : undefined,
-          boxShadow: hasShowtimes ? "var(--shadow-glow)" : undefined,
+          border: hasShowtimes ? "1px solid var(--border-default)" : undefined,
         } as React.CSSProperties
       }
     >
@@ -321,10 +285,10 @@ function DateCard({
         ) : hasShowtimes ? (
           <span
             style={{
-              background: "var(--success-subtle)",
-              color: "var(--success)",
+              background: "transparent",
+              color: "#FFFFFF",
               border: "1px solid",
-              borderColor: "var(--success)",
+              borderColor: "#FFFFFF",
               padding: "4px 12px",
               borderRadius: 4,
               fontSize: "var(--text-xs)",
@@ -442,7 +406,6 @@ function TheaterTabs({
   onChange,
   theaters,
   theaterList,
-  bestCombo,
 }: {
   selected: string;
   onChange: (slug: string) => void;
@@ -454,7 +417,7 @@ function TheaterTabs({
     <div
       style={{
         display: "flex",
-        gap: "var(--space-xs)",
+        gap: "var(--space-sm)",
         flexWrap: "wrap",
         marginBottom: "var(--space-base)",
       }}
@@ -463,12 +426,6 @@ function TheaterTabs({
     >
       {theaterList.map((theater) => {
         const isSelected = selected === theater.slug;
-        const hasAny = theaters?.[theater.slug]
-          ? Object.values(theaters[theater.slug].formats).some((f) =>
-              Object.values(f.dates).some((d) => d.available)
-            )
-          : false;
-        const isBest = bestCombo?.theaterSlug === theater.slug;
 
         return (
           <button
@@ -480,14 +437,14 @@ function TheaterTabs({
               display: "inline-flex",
               alignItems: "center",
               gap: "var(--space-sm)",
-              padding: "var(--space-sm) var(--space-base)",
-              borderRadius: 8,
-              border: `1.5px solid ${isSelected ? "var(--accent)" : "var(--border-subtle)"}`,
-              background: isSelected ? "var(--bg-elevated)" : "transparent",
-              color: isSelected ? "var(--text-primary)" : "var(--text-secondary)",
+              padding: "8px 16px",
+              borderRadius: 20,
+              border: `1px solid ${isSelected ? "#FFFFFF" : "#444444"}`,
+              background: isSelected ? "#FFFFFF" : "#2A2A2A",
+              color: isSelected ? "#000000" : "#FFFFFF",
               fontFamily: "inherit",
-              fontSize: "var(--text-sm)",
-              fontWeight: isSelected ? 700 : 500,
+              fontSize: 13,
+              fontWeight: 600,
               cursor: "pointer",
               transition: "all var(--dur-fast) var(--ease-default)",
               whiteSpace: "nowrap",
@@ -498,39 +455,12 @@ function TheaterTabs({
               <span
                 style={{
                   fontSize: "var(--text-xs)",
-                  color: "var(--text-tertiary)",
+                  color: isSelected ? "#666666" : "var(--text-tertiary)",
                   fontWeight: 400,
                 }}
               >
                 {theater.neighborhood}
               </span>
-            )}
-            {isBest && hasAny && (
-              <span
-                style={{
-                  background: "var(--accent)",
-                  color: "oklch(98% 0.005 75)",
-                  fontSize: 10,
-                  fontWeight: 800,
-                  padding: "1px 6px",
-                  borderRadius: 3,
-                  letterSpacing: "0.5px",
-                  lineHeight: 1.6,
-                }}
-              >
-                BEST
-              </span>
-            )}
-            {hasAny && !isBest && (
-              <span
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: "50%",
-                  background: "var(--success)",
-                  flexShrink: 0,
-                }}
-              />
             )}
           </button>
         );
@@ -546,8 +476,6 @@ function FormatPills({
   selected,
   onChange,
   theaterData,
-  bestCombo,
-  theaterSlug,
 }: {
   selected: string;
   onChange: (tag: string) => void;
@@ -559,7 +487,7 @@ function FormatPills({
     <div
       style={{
         display: "flex",
-        gap: "var(--space-xs)",
+        gap: "var(--space-sm)",
         flexWrap: "wrap",
         marginBottom: "var(--space-lg)",
       }}
@@ -568,11 +496,6 @@ function FormatPills({
     >
       {FORMAT_LIST.map((format) => {
         const isSelected = selected === format.tag;
-        const hasAny = theaterData?.formats[format.tag]
-          ? Object.values(theaterData.formats[format.tag].dates).some((d) => d.available)
-          : false;
-        const isBest =
-          bestCombo?.theaterSlug === theaterSlug && bestCombo?.formatTag === format.tag;
 
         return (
           <button
@@ -583,46 +506,20 @@ function FormatPills({
               display: "inline-flex",
               alignItems: "center",
               gap: "var(--space-xs)",
-              padding: "6px 14px",
-              borderRadius: 100,
-              border: `1.5px solid ${isSelected ? "var(--accent)" : "var(--border-subtle)"}`,
-              background: isSelected ? "var(--accent)" : "transparent",
-              color: isSelected ? "oklch(98% 0.005 75)" : "var(--text-secondary)",
+              padding: "8px 16px",
+              borderRadius: 20,
+              border: `1px solid ${isSelected ? "#FFFFFF" : "#444444"}`,
+              background: isSelected ? "#FFFFFF" : "#2A2A2A",
+              color: isSelected ? "#000000" : "#FFFFFF",
               fontFamily: "inherit",
-              fontSize: "var(--text-xs)",
-              fontWeight: 700,
+              fontSize: 13,
+              fontWeight: 600,
               cursor: "pointer",
               letterSpacing: "0.5px",
               transition: "all var(--dur-fast) var(--ease-default)",
             }}
           >
             {format.label}
-            {isBest && hasAny && (
-              <span
-                style={{
-                  background: isSelected ? "rgba(0,0,0,0.2)" : "var(--accent)",
-                  color: "oklch(98% 0.005 75)",
-                  fontSize: 9,
-                  fontWeight: 900,
-                  padding: "1px 5px",
-                  borderRadius: 3,
-                  letterSpacing: "0.5px",
-                }}
-              >
-                BEST
-              </span>
-            )}
-            {hasAny && (
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: "50%",
-                  background: isSelected ? "rgba(255,255,255,0.7)" : "var(--success)",
-                  flexShrink: 0,
-                }}
-              />
-            )}
           </button>
         );
       })}
@@ -1047,7 +944,7 @@ function MovieSetup({
                           padding: "1px 6px",
                           borderRadius: 3,
                           background: f === "imax70mm" ? "var(--accent)" : "var(--bg-elevated)",
-                          color: f === "imax70mm" ? "oklch(98% 0.005 75)" : "var(--text-tertiary)",
+                          color: f === "imax70mm" ? "#FFFFFF" : "var(--text-tertiary)",
                           letterSpacing: "0.5px",
                         }}
                       >
@@ -1367,7 +1264,6 @@ export default function Home() {
   if (!mounted) {
     return (
       <div style={{ minHeight: "100vh" }}>
-        <div className="film-strip-border" style={{ background: "var(--accent)" }} />
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "80vh" }}>
           <div className="projector-spinner" />
         </div>
@@ -1377,35 +1273,15 @@ export default function Home() {
 
   return (
     <div style={{ minHeight: "100vh" }}>
-      <ThemeToggle />
-
-      <div className="film-strip-border" style={{ background: "var(--accent)" }} />
-
       {/* ===== HERO ===== */}
       <header
-        className="film-grain light-leak"
         style={{
-          background: `linear-gradient(180deg, var(--bg-base) 0%, var(--bg-surface) 40%, var(--bg-base) 100%)`,
+          background: "var(--bg-base)",
           padding: "var(--space-2xl) var(--space-lg) var(--space-xl)",
           textAlign: "center",
           position: "relative",
-          overflow: "hidden",
         }}
       >
-        <div
-          style={{
-            position: "absolute",
-            top: "40%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: "min(600px, 100vw)",
-            height: 400,
-            borderRadius: "50%",
-            background:
-              "radial-gradient(circle, oklch(55% 0.24 27 / 0.06) 0%, transparent 70%)",
-            pointerEvents: "none",
-          }}
-        />
 
         <div style={{ position: "relative", zIndex: 2, maxWidth: 700, margin: "0 auto" }}>
           <div
@@ -1422,7 +1298,7 @@ export default function Home() {
           >
             <span
               style={{
-                color: "oklch(98% 0.005 75)",
+                color: "#FFFFFF",
                 fontSize: "var(--text-xs)",
                 fontWeight: 800,
                 letterSpacing: "2.5px",
@@ -1449,13 +1325,12 @@ export default function Home() {
           </h1>
 
           <p
-            className="font-display hero-enter hero-enter-delay-2"
+            className="hero-enter hero-enter-delay-2"
             style={{
-              fontSize: "var(--text-base)",
+              fontSize: "var(--text-sm)",
               color: "var(--text-secondary)",
               margin: 0,
               fontWeight: 400,
-              fontStyle: "italic",
             }}
           >
             {step === "results"
@@ -1508,8 +1383,8 @@ export default function Home() {
                         width: 24,
                         height: 24,
                         borderRadius: "50%",
-                        background: isActive ? "var(--accent)" : isDone ? "var(--success)" : "var(--bg-elevated)",
-                        color: isActive || isDone ? "white" : "var(--text-tertiary)",
+                        background: isActive ? "var(--accent)" : isDone ? "#FFFFFF" : "var(--bg-elevated)",
+                        color: isActive ? "white" : isDone ? "#000000" : "var(--text-tertiary)",
                         display: "inline-flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -1723,7 +1598,6 @@ export default function Home() {
             padding: "var(--space-xl) 0 var(--space-2xl)",
           }}
         >
-          <div className="film-strip-border" style={{ marginBottom: "var(--space-xl)", opacity: 0.4 }} />
 
           <div
             style={{
@@ -1817,7 +1691,6 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="film-strip-border" style={{ marginTop: "var(--space-xl)", opacity: 0.4 }} />
         </footer>
       </main>
     </div>
