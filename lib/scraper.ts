@@ -9,6 +9,8 @@ export interface Showtime {
   amPm: string;
   status: "Sellable" | "AlmostFull" | "SoldOut" | string;
   url: string;
+  /** Discount/promo label from AMC listing page, e.g. "20% OFF", "UP TO 15% OFF" */
+  promo?: string;
 }
 
 export interface DateResult {
@@ -170,7 +172,8 @@ export function extractFormatShowtimes(html: string, formatTag: string): Showtim
     const srMatch = afterChunk.match(
       /<span[^>]*class="sr-only">([^<]*)<\/span>/i
     );
-    const srOnly = srMatch ? srMatch[1].toLowerCase() : "";
+    const srRaw = srMatch ? srMatch[1] : "";
+    const srOnly = srRaw.toLowerCase();
 
     let status: Showtime["status"] = "Sellable";
     if (srOnly.includes("sold out") || srOnly.includes("unavailable")) {
@@ -179,12 +182,21 @@ export function extractFormatShowtimes(html: string, formatTag: string): Showtim
       status = "AlmostFull";
     }
 
+    // Extract promo/discount text: parts of sr-only that are not status keywords
+    const STATUS_KEYWORDS = ["sold out", "almost full", "unavailable", "sellable"];
+    const promoParts = srRaw
+      .split(",")
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0 && !STATUS_KEYWORDS.includes(p.toLowerCase()));
+    const promo = promoParts.length > 0 ? promoParts.join(", ") : undefined;
+
     showtimes.push({
       id,
       time,
       amPm,
       status,
       url: `https://www.amctheatres.com/showtimes/${id}`,
+      ...(promo !== undefined && { promo }),
     });
   }
 

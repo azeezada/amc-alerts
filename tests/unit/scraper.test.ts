@@ -512,6 +512,97 @@ describe("1.9 Timezone Date Handling", () => {
 });
 
 /* =========================================================================
+   1.10 Promo/Discount Extraction
+   ========================================================================= */
+
+describe("1.10 Promo/Discount Extraction", () => {
+  it("extracts discount from '20% OFF' sr-only text", () => {
+    const html = makeShowtimeAnchor(
+      "7001", "1:00", "PM", "imax70mm", "test-00001",
+      "amc-lincoln-square-13",
+      "20% OFF"
+    );
+    const showtimes = extractFormatShowtimes(html, "imax70mm");
+    expect(showtimes.length).toBe(1);
+    expect(showtimes[0].promo).toBe("20% OFF");
+    expect(showtimes[0].status).toBe("Sellable");
+  });
+
+  it("extracts discount from 'UP TO 15% OFF' sr-only text", () => {
+    const html = makeShowtimeAnchor(
+      "7002", "2:00", "PM", "imax70mm", "test-00001",
+      "amc-lincoln-square-13",
+      "UP TO 15% OFF"
+    );
+    const showtimes = extractFormatShowtimes(html, "imax70mm");
+    expect(showtimes[0].promo).toBe("UP TO 15% OFF");
+    expect(showtimes[0].status).toBe("Sellable");
+  });
+
+  it("extracts promo and status from 'UP TO 15% OFF, Almost Full'", () => {
+    const html = makeShowtimeAnchor(
+      "7003", "3:00", "PM", "imax70mm", "test-00001",
+      "amc-lincoln-square-13",
+      "UP TO 15% OFF, Almost Full"
+    );
+    const showtimes = extractFormatShowtimes(html, "imax70mm");
+    expect(showtimes[0].promo).toBe("UP TO 15% OFF");
+    expect(showtimes[0].status).toBe("AlmostFull");
+  });
+
+  it("no promo when sr-only is only status 'Almost Full'", () => {
+    const html = makeShowtimeAnchor(
+      "7004", "4:00", "PM", "imax70mm", "test-00001",
+      "amc-lincoln-square-13",
+      "Almost Full"
+    );
+    const showtimes = extractFormatShowtimes(html, "imax70mm");
+    expect(showtimes[0].promo).toBeUndefined();
+    expect(showtimes[0].status).toBe("AlmostFull");
+  });
+
+  it("no promo when sr-only is empty", () => {
+    const html = makeShowtimeAnchor(
+      "7005", "5:00", "PM", "imax70mm", "test-00001"
+    );
+    const showtimes = extractFormatShowtimes(html, "imax70mm");
+    expect(showtimes[0].promo).toBeUndefined();
+    expect(showtimes[0].status).toBe("Sellable");
+  });
+
+  it("no promo when sr-only is 'Sold Out'", () => {
+    const html = makeShowtimeAnchor(
+      "7006", "6:00", "PM", "imax70mm", "test-00001",
+      "amc-lincoln-square-13",
+      "Sold Out"
+    );
+    const showtimes = extractFormatShowtimes(html, "imax70mm");
+    expect(showtimes[0].promo).toBeUndefined();
+    expect(showtimes[0].status).toBe("SoldOut");
+  });
+
+  it("real fixture: some PHM IMAX 70mm showtimes have promo text", () => {
+    const section = extractMovieSection(fixture0326, "project-hail-mary-76779")!;
+    const showtimes = extractFormatShowtimes(section, "imax70mm");
+    // Real fixture has 'UP TO 15% OFF, Almost Full' on some showtimes
+    const withPromo = showtimes.filter((s) => s.promo !== undefined);
+    expect(withPromo.length).toBeGreaterThan(0);
+    for (const st of withPromo) {
+      expect(typeof st.promo).toBe("string");
+      expect(st.promo!.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("real fixture: PHM Dolby showtimes with '20% OFF' have promo field", () => {
+    const section = extractMovieSection(fixture0326, "project-hail-mary-76779")!;
+    const showtimes = extractFormatShowtimes(section, "dolbycinema");
+    const withPromo = showtimes.filter((s) => s.promo !== undefined);
+    // Dolby showtimes in 03-26 fixture have '20% OFF' promo
+    expect(withPromo.length).toBeGreaterThan(0);
+  });
+});
+
+/* =========================================================================
    5.1 HTML Fixture: No-Format Movies → "standard" Fallback
    ========================================================================= */
 
