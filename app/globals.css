@@ -357,6 +357,12 @@ input[type="checkbox"] {
    ========================================================================= */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
+}
+
+/* Hide scrollbar for movie carousel */
+[data-testid="movie-list"]::-webkit-scrollbar {
+  display: none;
 }
 ::-webkit-scrollbar-track {
   background: var(--bg-base);

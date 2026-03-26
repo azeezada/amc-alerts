@@ -48,6 +48,8 @@ interface MovieInfo {
   slug: string;
   title: string;
   formats: string[];
+  poster?: string;
+  description?: string;
 }
 
 const FORMAT_LIST = [
@@ -862,8 +864,179 @@ function TheaterSetup({
 }
 
 /* =========================================================================
-   SETUP FLOW — Step 2: Movie Selection
+   SETUP FLOW — Step 2: Movie Selection (Carousel)
    ========================================================================= */
+const FORMAT_LABELS: Record<string, string> = {
+  imax70mm: "IMAX 70mm",
+  dolbycinema: "Dolby Cinema",
+  imax: "IMAX",
+  standard: "Standard",
+};
+
+function MovieCard({
+  movie,
+  isSelected,
+  onSelect,
+}: {
+  movie: MovieInfo;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      data-testid={`movie-${movie.slug}`}
+      onClick={onSelect}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        width: 180,
+        flexShrink: 0,
+        borderRadius: 10,
+        border: `2px solid ${isSelected ? "var(--accent)" : "var(--border-subtle)"}`,
+        background: isSelected ? "var(--accent-subtle)" : "var(--bg-surface)",
+        color: "var(--text-primary)",
+        fontFamily: "inherit",
+        cursor: "pointer",
+        transition: "all var(--dur-fast) var(--ease-default)",
+        textAlign: "left",
+        padding: 0,
+        overflow: "hidden",
+        position: "relative",
+        scrollSnapAlign: "start",
+      }}
+      aria-pressed={isSelected}
+    >
+      {/* Poster */}
+      <div
+        style={{
+          width: "100%",
+          aspectRatio: "2/3",
+          background: "var(--bg-elevated)",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        {movie.poster ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={movie.poster}
+            alt={movie.title}
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          />
+        ) : (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--text-disabled)",
+              fontSize: 40,
+            }}
+          >
+            🎬
+          </div>
+        )}
+        {/* Selected checkmark overlay */}
+        {isSelected && (
+          <div
+            style={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              background: "var(--accent)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#FFFFFF",
+              fontSize: 16,
+              fontWeight: 800,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+            }}
+          >
+            ✓
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div style={{ padding: "var(--space-md)", flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+        <div
+          style={{
+            fontWeight: 700,
+            fontSize: "var(--text-sm)",
+            lineHeight: "var(--leading-tight)",
+            color: "var(--text-primary)",
+          }}
+        >
+          {movie.title}
+        </div>
+
+        {movie.description && (
+          <div
+            style={{
+              fontSize: 11,
+              color: "var(--text-tertiary)",
+              lineHeight: "1.4",
+              display: "-webkit-box",
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            } as React.CSSProperties}
+          >
+            {movie.description}
+          </div>
+        )}
+
+        {/* Format tags */}
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: "auto", paddingTop: 4 }}>
+          {movie.formats.map((f) => (
+            <span
+              key={f}
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                padding: "1px 5px",
+                borderRadius: 3,
+                background: f === "imax70mm" ? "var(--accent)" : "var(--bg-elevated)",
+                color: f === "imax70mm" ? "#FFFFFF" : "var(--text-tertiary)",
+                letterSpacing: "0.5px",
+                textTransform: "uppercase",
+              }}
+            >
+              {FORMAT_LABELS[f] || f}
+            </span>
+          ))}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function MovieCarouselSkeleton() {
+  return (
+    <div style={{ display: "flex", gap: "var(--space-md)", overflowX: "hidden" }}>
+      {[1, 2, 3].map((i) => (
+        <div
+          key={i}
+          style={{ width: 180, flexShrink: 0, borderRadius: 10, overflow: "hidden", animationDelay: `${i * 100}ms` }}
+        >
+          <div className="skeleton" style={{ width: "100%", aspectRatio: "2/3" }} />
+          <div style={{ padding: "var(--space-md)" }}>
+            <div className="skeleton" style={{ width: "80%", height: 16, marginBottom: 8 }} />
+            <div className="skeleton" style={{ width: "100%", height: 10, marginBottom: 4 }} />
+            <div className="skeleton" style={{ width: "70%", height: 10 }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function MovieSetup({
   theaters,
   selectedMovie,
@@ -893,13 +1066,6 @@ function MovieSetup({
       .catch(() => setLoading(false));
   }, [theaters]);
 
-  const formatLabels: Record<string, string> = {
-    imax70mm: "IMAX 70mm",
-    dolbycinema: "Dolby Cinema",
-    imax: "IMAX",
-    standard: "Standard",
-  };
-
   return (
     <div data-testid="movie-setup">
       <h2
@@ -919,15 +1085,11 @@ function MovieSetup({
           margin: "0 0 var(--space-lg)",
         }}
       >
-        Choose the movie you want to track showtimes for.
+        Swipe to browse movies playing now. Tap to select.
       </p>
 
       {loading ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="skeleton" style={{ height: 64, animationDelay: `${i * 100}ms` }} />
-          ))}
-        </div>
+        <MovieCarouselSkeleton />
       ) : movies.length === 0 ? (
         <div
           className="card"
@@ -943,59 +1105,28 @@ function MovieSetup({
         </div>
       ) : (
         <div
-          style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginBottom: "var(--space-lg)" }}
           data-testid="movie-list"
+          style={{
+            display: "flex",
+            gap: "var(--space-md)",
+            overflowX: "auto",
+            scrollSnapType: "x mandatory",
+            scrollPadding: "0 var(--space-md)",
+            paddingBottom: "var(--space-md)",
+            marginBottom: "var(--space-lg)",
+            WebkitOverflowScrolling: "touch",
+            msOverflowStyle: "none",
+            scrollbarWidth: "none",
+          } as React.CSSProperties}
         >
-          {movies.map((m) => {
-            const isSelected = selectedMovie === m.slug;
-            return (
-              <button
-                key={m.slug}
-                data-testid={`movie-${m.slug}`}
-                onClick={() => onSelect(m.slug, m.title)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "var(--space-md) var(--space-base)",
-                  borderRadius: 8,
-                  border: `1.5px solid ${isSelected ? "var(--accent)" : "var(--border-subtle)"}`,
-                  background: isSelected ? "var(--accent-subtle)" : "var(--bg-surface)",
-                  color: "var(--text-primary)",
-                  fontFamily: "inherit",
-                  fontSize: "var(--text-sm)",
-                  cursor: "pointer",
-                  transition: "all var(--dur-fast) var(--ease-default)",
-                  textAlign: "left",
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 700 }}>{m.title}</div>
-                  <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
-                    {m.formats.map((f) => (
-                      <span
-                        key={f}
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          padding: "1px 6px",
-                          borderRadius: 3,
-                          background: f === "imax70mm" ? "var(--accent)" : "var(--bg-elevated)",
-                          color: f === "imax70mm" ? "#FFFFFF" : "var(--text-tertiary)",
-                          letterSpacing: "0.5px",
-                        }}
-                      >
-                        {formatLabels[f] || f}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                {isSelected && (
-                  <span style={{ color: "var(--accent)", fontSize: 20, fontWeight: 800 }}>{"\u2713"}</span>
-                )}
-              </button>
-            );
-          })}
+          {movies.map((m) => (
+            <MovieCard
+              key={m.slug}
+              movie={m}
+              isSelected={selectedMovie === m.slug}
+              onSelect={() => onSelect(m.slug, m.title)}
+            />
+          ))}
         </div>
       )}
 
