@@ -8,6 +8,7 @@
     "build:cf": "npx @cloudflare/next-on-pages",
     "start": "next start",
     "lint": "eslint",
+    "test:unit": "npx playwright test --config playwright.unit.config.ts",
     "deploy": "npm run build:cf && wrangler pages deploy .vercel/output/static --project-name amc-alerts"
   },
   "dependencies": {
