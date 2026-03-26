@@ -8,7 +8,8 @@
     "build:cf": "npx @cloudflare/next-on-pages",
     "start": "next start",
     "lint": "eslint",
-    "test:unit": "npx playwright test --config playwright.unit.config.ts",
+    "test:unit": "vitest run",
+    "test:unit:pw": "npx playwright test --config playwright.unit.config.ts",
     "deploy": "npm run build:cf && wrangler pages deploy .vercel/output/static --project-name amc-alerts"
   },
   "dependencies": {
@@ -28,6 +29,7 @@
     "playwright": "^1.58.2",
     "tailwindcss": "^4",
     "typescript": "^5",
+    "vitest": "^4.1.1",
     "wrangler": "^4.76.0"
   }
 }

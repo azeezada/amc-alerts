@@ -71,13 +71,18 @@ function formatDateNice(dateStr: string): { weekday: string; date: string } {
 }
 
 function toDateStr(d: Date): string {
-  return d.toISOString().split("T")[0];
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function generateDateRange(start: string, end: string): string[] {
   const dates: string[] = [];
-  const s = new Date(start + "T00:00:00");
-  const e = new Date(end + "T00:00:00");
+  const [sy, sm, sd] = start.split("-").map(Number);
+  const [ey, em, ed] = end.split("-").map(Number);
+  const s = new Date(sy, sm - 1, sd);
+  const e = new Date(ey, em - 1, ed);
   while (s <= e) {
     dates.push(toDateStr(s));
     s.setDate(s.getDate() + 1);

@@ -1,0 +1,1457 @@
+{
+  "description": "AMC showtimes HTML fixtures from Lincoln Square 13, captured 2026-03-26",
+  "fixtures": {
+    "amc-lincoln-square-2026-03-26.html": {
+      "date": "2026-03-26",
+      "theater": "amc-lincoln-square-13",
+      "movieCount": 12,
+      "totalShowtimes": 40,
+      "movies": {
+        "project-hail-mary-76779": {
+          "showtimeCount": 11,
+          "showtimes": [
+            {
+              "id": "140840248",
+              "time": "11:00AM",
+              "format": "imax70mm",
+              "status": "AlmostFull"
+            },
+            {
+              "id": "140840247",
+              "time": "3:00PM",
+              "format": "imax70mm",
+              "status": "AlmostFull"
+            },
+            {
+              "id": "140840246",
+              "time": "7:00PM",
+              "format": "imax70mm",
+              "status": "AlmostFull"
+            },
+            {
+              "id": "140840249",
+              "time": "10:45PM",
+              "format": "imax70mm",
+              "status": "AlmostFull"
+            },
+            {
+              "id": "140846596",
+              "time": "10:00AM",
+              "format": "dolbycinema",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846595",
+              "time": "2:00PM",
+              "format": "dolbycinema",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846594",
+              "time": "6:00PM",
+              "format": "dolbycinema",
+              "status": "Sellable"
+            },
+            {
+              "id": "141797405",
+              "time": "10:00PM",
+              "format": "dolbycinema",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846612",
+              "time": "12:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846613",
+              "time": "4:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846614",
+              "time": "8:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "ready-or-not-2-here-i-come-80592": {
+          "showtimeCount": 5,
+          "showtimes": [
+            {
+              "id": "141726481",
+              "time": "10:30AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726480",
+              "time": "1:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726479",
+              "time": "4:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726482",
+              "time": "7:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726450",
+              "time": "10:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "reminders-of-him-71462": {
+          "showtimeCount": 1,
+          "showtimes": [
+            {
+              "id": "141726567",
+              "time": "1:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "hoppers-72462": {
+          "showtimeCount": 5,
+          "showtimes": [
+            {
+              "id": "141726517",
+              "time": "12:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726518",
+              "time": "10:00AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726516",
+              "time": "3:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726559",
+              "time": "6:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726514",
+              "time": "9:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "one-battle-after-another-82557": {
+          "showtimeCount": 1,
+          "showtimes": [
+            {
+              "id": "141726519",
+              "time": "11:00AM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "wuthering-heights-79035": {
+          "showtimeCount": 1,
+          "showtimes": [
+            {
+              "id": "141726557",
+              "time": "2:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "hamnet-80181": {
+          "showtimeCount": 1,
+          "showtimes": [
+            {
+              "id": "141726486",
+              "time": "10:00AM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "marc-by-sofia-83058": {
+          "showtimeCount": 2,
+          "showtimes": [
+            {
+              "id": "141726485",
+              "time": "1:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726484",
+              "time": "3:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "the-ai-doc-or-how-i-became-an-apocaloptimist-82383": {
+          "showtimeCount": 4,
+          "showtimes": [
+            {
+              "id": "141579315",
+              "time": "2:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579316",
+              "time": "4:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579317",
+              "time": "7:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579318",
+              "time": "10:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "they-will-kill-you-71213": {
+          "showtimeCount": 4,
+          "showtimes": [
+            {
+              "id": "141260990",
+              "time": "3:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141260991",
+              "time": "5:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141260992",
+              "time": "8:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141260993",
+              "time": "10:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "forbidden-fruits-82601": {
+          "showtimeCount": 3,
+          "showtimes": [
+            {
+              "id": "141726569",
+              "time": "4:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726558",
+              "time": "8:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726568",
+              "time": "10:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "alpha-dir-ducournau-81466": {
+          "showtimeCount": 2,
+          "showtimes": [
+            {
+              "id": "141579360",
+              "time": "7:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579345",
+              "time": "10:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        }
+      }
+    },
+    "amc-lincoln-square-2026-03-27.html": {
+      "date": "2026-03-27",
+      "theater": "amc-lincoln-square-13",
+      "movieCount": 11,
+      "totalShowtimes": 53,
+      "movies": {
+        "forbidden-fruits-q-a-w-director-meredith-alloway-writer-lily-houghton-83156": {
+          "showtimeCount": 1,
+          "showtimes": [
+            {
+              "id": "141506016",
+              "time": "7:00PM",
+              "format": "standard",
+              "status": "AlmostFull"
+            }
+          ]
+        },
+        "project-hail-mary-76779": {
+          "showtimeCount": 15,
+          "showtimes": [
+            {
+              "id": "140840252",
+              "time": "11:00AM",
+              "format": "imax70mm",
+              "status": "AlmostFull"
+            },
+            {
+              "id": "140840251",
+              "time": "3:00PM",
+              "format": "imax70mm",
+              "status": "AlmostFull"
+            },
+            {
+              "id": "140840250",
+              "time": "7:00PM",
+              "format": "imax70mm",
+              "status": "AlmostFull"
+            },
+            {
+              "id": "140840253",
+              "time": "11:00PM",
+              "format": "imax70mm",
+              "status": "AlmostFull"
+            },
+            {
+              "id": "140846597",
+              "time": "10:00AM",
+              "format": "dolbycinema",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846598",
+              "time": "2:00PM",
+              "format": "dolbycinema",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846599",
+              "time": "6:00PM",
+              "format": "dolbycinema",
+              "status": "AlmostFull"
+            },
+            {
+              "id": "141726451",
+              "time": "10:00PM",
+              "format": "dolbycinema",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846615",
+              "time": "12:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846616",
+              "time": "4:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846617",
+              "time": "8:00PM",
+              "format": "standard",
+              "status": "AlmostFull"
+            },
+            {
+              "id": "141726510",
+              "time": "10:30AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726511",
+              "time": "2:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726512",
+              "time": "6:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726513",
+              "time": "10:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "ready-or-not-2-here-i-come-80592": {
+          "showtimeCount": 5,
+          "showtimes": [
+            {
+              "id": "141726524",
+              "time": "10:15AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726523",
+              "time": "1:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726522",
+              "time": "4:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726520",
+              "time": "7:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726521",
+              "time": "10:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "reminders-of-him-71462": {
+          "showtimeCount": 1,
+          "showtimes": [
+            {
+              "id": "141726566",
+              "time": "4:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "hoppers-72462": {
+          "showtimeCount": 5,
+          "showtimes": [
+            {
+              "id": "141726461",
+              "time": "10:30AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726575",
+              "time": "1:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726608",
+              "time": "3:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726609",
+              "time": "6:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726556",
+              "time": "10:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "wuthering-heights-79035": {
+          "showtimeCount": 2,
+          "showtimes": [
+            {
+              "id": "141726562",
+              "time": "1:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726561",
+              "time": "7:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "they-will-kill-you-71213": {
+          "showtimeCount": 6,
+          "showtimes": [
+            {
+              "id": "141260999",
+              "time": "10:00AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141260998",
+              "time": "12:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141260997",
+              "time": "3:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141260994",
+              "time": "5:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141260995",
+              "time": "8:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141260996",
+              "time": "11:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "the-ai-doc-or-how-i-became-an-apocaloptimist-82383": {
+          "showtimeCount": 5,
+          "showtimes": [
+            {
+              "id": "141579322",
+              "time": "10:45AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579349",
+              "time": "1:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579330",
+              "time": "4:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579353",
+              "time": "7:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579321",
+              "time": "10:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "forbidden-fruits-82601": {
+          "showtimeCount": 5,
+          "showtimes": [
+            {
+              "id": "141726489",
+              "time": "11:00AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726462",
+              "time": "1:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726463",
+              "time": "4:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726606",
+              "time": "8:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726464",
+              "time": "10:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "marc-by-sofia-83058": {
+          "showtimeCount": 4,
+          "showtimes": [
+            {
+              "id": "141726610",
+              "time": "12:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726560",
+              "time": "4:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726564",
+              "time": "7:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726565",
+              "time": "10:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "alpha-dir-ducournau-81466": {
+          "showtimeCount": 4,
+          "showtimes": [
+            {
+              "id": "141579320",
+              "time": "1:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726488",
+              "time": "4:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579319",
+              "time": "7:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579352",
+              "time": "10:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        }
+      }
+    },
+    "amc-lincoln-square-2026-03-28.html": {
+      "date": "2026-03-28",
+      "theater": "amc-lincoln-square-13",
+      "movieCount": 11,
+      "totalShowtimes": 55,
+      "movies": {
+        "forbidden-fruits-q-a-w-director-meredith-alloway-writer-lily-houghton-83156": {
+          "showtimeCount": 1,
+          "showtimes": [
+            {
+              "id": "141521144",
+              "time": "7:00PM",
+              "format": "standard",
+              "status": "AlmostFull"
+            }
+          ]
+        },
+        "project-hail-mary-76779": {
+          "showtimeCount": 14,
+          "showtimes": [
+            {
+              "id": "140840256",
+              "time": "11:00AM",
+              "format": "imax70mm",
+              "status": "AlmostFull"
+            },
+            {
+              "id": "140840255",
+              "time": "3:00PM",
+              "format": "imax70mm",
+              "status": "AlmostFull"
+            },
+            {
+              "id": "140840254",
+              "time": "7:00PM",
+              "format": "imax70mm",
+              "status": "AlmostFull"
+            },
+            {
+              "id": "140840257",
+              "time": "10:45PM",
+              "format": "imax70mm",
+              "status": "AlmostFull"
+            },
+            {
+              "id": "140846600",
+              "time": "10:00AM",
+              "format": "dolbycinema",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846601",
+              "time": "2:00PM",
+              "format": "dolbycinema",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846602",
+              "time": "6:00PM",
+              "format": "dolbycinema",
+              "status": "AlmostFull"
+            },
+            {
+              "id": "141726452",
+              "time": "10:00PM",
+              "format": "dolbycinema",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846618",
+              "time": "12:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846619",
+              "time": "4:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846620",
+              "time": "8:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726490",
+              "time": "11:30AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726491",
+              "time": "6:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726494",
+              "time": "10:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "ready-or-not-2-here-i-come-80592": {
+          "showtimeCount": 5,
+          "showtimes": [
+            {
+              "id": "141726527",
+              "time": "4:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726529",
+              "time": "10:15AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726528",
+              "time": "1:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726525",
+              "time": "7:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726526",
+              "time": "10:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "reminders-of-him-71462": {
+          "showtimeCount": 1,
+          "showtimes": [
+            {
+              "id": "141726570",
+              "time": "4:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "hoppers-72462": {
+          "showtimeCount": 5,
+          "showtimes": [
+            {
+              "id": "141726465",
+              "time": "1:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726467",
+              "time": "10:00AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726466",
+              "time": "4:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726605",
+              "time": "6:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726551",
+              "time": "10:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "wuthering-heights-79035": {
+          "showtimeCount": 3,
+          "showtimes": [
+            {
+              "id": "141726553",
+              "time": "10:00AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726571",
+              "time": "1:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726554",
+              "time": "6:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "they-will-kill-you-71213": {
+          "showtimeCount": 6,
+          "showtimes": [
+            {
+              "id": "141261004",
+              "time": "12:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141261005",
+              "time": "10:00AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141261003",
+              "time": "3:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141261000",
+              "time": "5:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141261001",
+              "time": "8:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141261002",
+              "time": "11:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "forbidden-fruits-82601": {
+          "showtimeCount": 6,
+          "showtimes": [
+            {
+              "id": "141726552",
+              "time": "1:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726603",
+              "time": "10:00AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726604",
+              "time": "3:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726509",
+              "time": "4:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726602",
+              "time": "8:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726460",
+              "time": "10:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "alpha-dir-ducournau-81466": {
+          "showtimeCount": 4,
+          "showtimes": [
+            {
+              "id": "141579324",
+              "time": "1:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726504",
+              "time": "10:30AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579323",
+              "time": "7:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579354",
+              "time": "10:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "marc-by-sofia-83058": {
+          "showtimeCount": 5,
+          "showtimes": [
+            {
+              "id": "141726555",
+              "time": "4:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726574",
+              "time": "10:30AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726607",
+              "time": "12:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726572",
+              "time": "7:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726573",
+              "time": "10:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "the-ai-doc-or-how-i-became-an-apocaloptimist-82383": {
+          "showtimeCount": 5,
+          "showtimes": [
+            {
+              "id": "141579356",
+              "time": "1:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579327",
+              "time": "10:45AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579325",
+              "time": "4:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579355",
+              "time": "7:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579326",
+              "time": "10:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        }
+      }
+    },
+    "amc-lincoln-square-2026-03-29.html": {
+      "date": "2026-03-29",
+      "theater": "amc-lincoln-square-13",
+      "movieCount": 10,
+      "totalShowtimes": 52,
+      "movies": {
+        "project-hail-mary-76779": {
+          "showtimeCount": 12,
+          "showtimes": [
+            {
+              "id": "140840261",
+              "time": "10:45PM",
+              "format": "imax70mm",
+              "status": "AlmostFull"
+            },
+            {
+              "id": "140846603",
+              "time": "10:00AM",
+              "format": "dolbycinema",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846604",
+              "time": "2:00PM",
+              "format": "dolbycinema",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846605",
+              "time": "6:00PM",
+              "format": "dolbycinema",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726453",
+              "time": "10:00PM",
+              "format": "dolbycinema",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846621",
+              "time": "12:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846622",
+              "time": "4:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "140846623",
+              "time": "8:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726505",
+              "time": "10:30AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726507",
+              "time": "2:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726506",
+              "time": "6:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726508",
+              "time": "10:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "ready-or-not-2-here-i-come-80592": {
+          "showtimeCount": 5,
+          "showtimes": [
+            {
+              "id": "141726532",
+              "time": "4:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726534",
+              "time": "10:15AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726533",
+              "time": "1:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726530",
+              "time": "7:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726531",
+              "time": "10:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "reminders-of-him-71462": {
+          "showtimeCount": 1,
+          "showtimes": [
+            {
+              "id": "141726576",
+              "time": "4:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "hoppers-72462": {
+          "showtimeCount": 5,
+          "showtimes": [
+            {
+              "id": "141726477",
+              "time": "10:30AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726476",
+              "time": "1:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726475",
+              "time": "4:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726598",
+              "time": "6:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726550",
+              "time": "10:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "wuthering-heights-79035": {
+          "showtimeCount": 3,
+          "showtimes": [
+            {
+              "id": "141726549",
+              "time": "6:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726577",
+              "time": "1:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726597",
+              "time": "9:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "they-will-kill-you-71213": {
+          "showtimeCount": 6,
+          "showtimes": [
+            {
+              "id": "141261010",
+              "time": "12:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141261011",
+              "time": "10:00AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141261009",
+              "time": "3:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141261006",
+              "time": "5:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141261007",
+              "time": "8:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141261008",
+              "time": "11:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "forbidden-fruits-82601": {
+          "showtimeCount": 6,
+          "showtimes": [
+            {
+              "id": "141726600",
+              "time": "10:15AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726544",
+              "time": "1:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726599",
+              "time": "3:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726493",
+              "time": "4:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726473",
+              "time": "7:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726474",
+              "time": "9:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "alpha-dir-ducournau-81466": {
+          "showtimeCount": 4,
+          "showtimes": [
+            {
+              "id": "141579329",
+              "time": "1:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726492",
+              "time": "10:30AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579328",
+              "time": "7:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579350",
+              "time": "10:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "marc-by-sofia-83058": {
+          "showtimeCount": 5,
+          "showtimes": [
+            {
+              "id": "141726580",
+              "time": "10:30AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726601",
+              "time": "1:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726548",
+              "time": "4:15PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726578",
+              "time": "7:30PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141726579",
+              "time": "10:00PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        },
+        "the-ai-doc-or-how-i-became-an-apocaloptimist-82383": {
+          "showtimeCount": 5,
+          "showtimes": [
+            {
+              "id": "141579348",
+              "time": "1:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579333",
+              "time": "10:45AM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579331",
+              "time": "4:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579351",
+              "time": "7:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            },
+            {
+              "id": "141579332",
+              "time": "10:45PM",
+              "format": "standard",
+              "status": "Sellable"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

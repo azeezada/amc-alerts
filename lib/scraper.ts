@@ -86,6 +86,34 @@ export function formatDateNice(dateStr: string): string {
   });
 }
 
+/**
+ * Format a Date as YYYY-MM-DD using local time (not UTC).
+ * Using toISOString().split("T")[0] is a common mistake — it converts to
+ * UTC first, so 11:30 PM EST becomes the next day's date.
+ */
+export function toDateStr(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Generate an array of YYYY-MM-DD strings from start to end (inclusive).
+ */
+export function generateDateRange(start: string, end: string): string[] {
+  const dates: string[] = [];
+  const [sy, sm, sd] = start.split("-").map(Number);
+  const [ey, em, ed] = end.split("-").map(Number);
+  const s = new Date(sy, sm - 1, sd);
+  const e = new Date(ey, em - 1, ed);
+  while (s <= e) {
+    dates.push(toDateStr(s));
+    s.setDate(s.getDate() + 1);
+  }
+  return dates;
+}
+
 /* -------------------------------------------------------------------------
    Fetch
    ------------------------------------------------------------------------- */
@@ -120,7 +148,7 @@ export async function fetchPage(date: string, theaterSlug: string, marketSlug?: 
 /**
  * Extract showtimes for a given format tag from AMC's SSR HTML.
  */
-function extractFormatShowtimes(html: string, formatTag: string): Showtime[] {
+export function extractFormatShowtimes(html: string, formatTag: string): Showtime[] {
   const showtimes: Showtime[] = [];
   const seen = new Set<string>();
   const isStandardImax = formatTag === "imax";

@@ -1,0 +1,140 @@
+/**
+ * Layer 4 (unit portion): Email Template Tests
+ * Tests buildEmailHtml and buildEmailText output correctness.
+ */
+import { describe, it, expect } from "vitest";
+import { buildEmailHtml, buildEmailText } from "@/lib/email";
+import type { DateResult } from "@/lib/scraper";
+
+/* -------------------------------------------------------------------------
+   Test data
+   ------------------------------------------------------------------------- */
+
+const sampleDates: DateResult[] = [
+  {
+    date: "2026-04-03",
+    available: true,
+    showtimes: [
+      {
+        id: "140840248",
+        time: "11:00",
+        amPm: "AM",
+        status: "Sellable",
+        url: "https://www.amctheatres.com/showtimes/140840248",
+      },
+      {
+        id: "140840247",
+        time: "3:00",
+        amPm: "PM",
+        status: "AlmostFull",
+        url: "https://www.amctheatres.com/showtimes/140840247",
+      },
+      {
+        id: "140840246",
+        time: "7:00",
+        amPm: "PM",
+        status: "SoldOut",
+        url: "https://www.amctheatres.com/showtimes/140840246",
+      },
+    ],
+  },
+  {
+    date: "2026-04-04",
+    available: true,
+    showtimes: [
+      {
+        id: "140840300",
+        time: "1:00",
+        amPm: "PM",
+        status: "Sellable",
+        url: "https://www.amctheatres.com/showtimes/140840300",
+      },
+    ],
+  },
+];
+
+/* =========================================================================
+   buildEmailHtml
+   ========================================================================= */
+
+describe("buildEmailHtml", () => {
+  const html = buildEmailHtml(sampleDates, "test-token-123", "user@example.com");
+
+  it("contains correct dates formatted nicely", () => {
+    expect(html).toContain("April 3"); // Thursday, April 3
+    expect(html).toContain("April 4");
+  });
+
+  it("contains all showtime times", () => {
+    expect(html).toContain("11:00 AM");
+    expect(html).toContain("3:00 PM");
+    expect(html).toContain("7:00 PM");
+    expect(html).toContain("1:00 PM");
+  });
+
+  it("contains all Buy Tickets URLs", () => {
+    expect(html).toContain("https://www.amctheatres.com/showtimes/140840248");
+    expect(html).toContain("https://www.amctheatres.com/showtimes/140840247");
+    expect(html).toContain("https://www.amctheatres.com/showtimes/140840246");
+    expect(html).toContain("https://www.amctheatres.com/showtimes/140840300");
+  });
+
+  it("contains status text for each showtime", () => {
+    expect(html).toContain("Sellable");
+    expect(html).toContain("AlmostFull");
+    expect(html).toContain("SoldOut");
+  });
+
+  it("contains unsubscribe link with token and email", () => {
+    expect(html).toContain("test-token-123");
+    expect(html).toContain("user%40example.com");
+    expect(html).toContain("Unsubscribe");
+  });
+
+  it("omits unsubscribe link when no token provided", () => {
+    const noUnsub = buildEmailHtml(sampleDates);
+    expect(noUnsub).not.toContain("Unsubscribe");
+  });
+
+  it("reports correct number of dates in banner", () => {
+    expect(html).toContain("2 dates");
+    const single = buildEmailHtml([sampleDates[0]]);
+    expect(single).toContain("1 date");
+  });
+
+  it("BUG: hardcodes 'Project Hail Mary' regardless of actual movie", () => {
+    // This test documents the hardcoded movie/theater bug
+    expect(html).toContain("Project Hail Mary");
+    expect(html).toContain("AMC Lincoln Square 13");
+    // These values are hardcoded in the template — they should be parameterized
+  });
+});
+
+/* =========================================================================
+   buildEmailText
+   ========================================================================= */
+
+describe("buildEmailText", () => {
+  const text = buildEmailText(sampleDates);
+
+  it("contains correct dates", () => {
+    expect(text).toContain("April 3");
+    expect(text).toContain("April 4");
+  });
+
+  it("contains showtime times and statuses", () => {
+    expect(text).toContain("11:00 AM — Sellable");
+    expect(text).toContain("3:00 PM — AlmostFull");
+    expect(text).toContain("7:00 PM — SoldOut");
+  });
+
+  it("contains Buy Tickets URLs", () => {
+    expect(text).toContain("https://www.amctheatres.com/showtimes/140840248");
+    expect(text).toContain("https://www.amctheatres.com/showtimes/140840300");
+  });
+
+  it("BUG: hardcodes 'Project Hail Mary' in plain text too", () => {
+    expect(text).toContain("Project Hail Mary");
+    expect(text).toContain("AMC Lincoln Square 13");
+  });
+});
