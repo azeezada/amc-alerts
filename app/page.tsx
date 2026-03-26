@@ -1461,55 +1461,53 @@ export default function Home() {
         </div>
       </header>
 
-      {/* ===== EMAIL SUBSCRIBE — prominent position below hero ===== */}
-      {step === "results" && (
-        <div
-          className="email-subscribe-bar"
-          data-testid="email-subscribe"
-          style={{
-            background: "var(--bg-surface)",
-            borderBottom: "1px solid var(--border-subtle)",
-            padding: "var(--space-base) var(--space-lg)",
-            textAlign: "center",
-            position: "sticky",
-            top: 0,
-            zIndex: 50,
-          }}
-        >
-          <div style={{ maxWidth: 960, margin: "0 auto" }}>
-            {subStatus === "success" ? (
-              <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", margin: 0 }}>{subMsg}</p>
-            ) : (
-              <>
-                <p style={{ margin: "0 0 var(--space-sm)", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-primary)" }}>
-                  Get notified when tickets drop
-                </p>
-                <form onSubmit={handleSubscribe} style={{ display: "flex", gap: "var(--space-sm)", maxWidth: 480, margin: "0 auto", flexWrap: "wrap", justifyContent: "center" }}>
-                  <input
-                    type="email"
-                    value={subEmail}
-                    onChange={(e) => setSubEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    required
-                    style={{ flex: 1, minWidth: 200 }}
-                  />
-                  <button
-                    type="submit"
-                    className="btn-primary"
-                    disabled={subStatus === "loading" || !subEmail}
-                  >
-                    {subStatus === "loading" ? "Subscribing..." : "Notify me"}
-                  </button>
-                  <div ref={turnstileRef} style={{ width: "100%", display: "flex", justifyContent: "center", marginTop: "var(--space-xs)" }} />
-                  {subStatus === "error" && (
-                    <p style={{ width: "100%", color: "var(--accent)", fontSize: "var(--text-xs)", margin: "var(--space-xs) 0 0" }}>{subMsg}</p>
-                  )}
-                </form>
-              </>
-            )}
-          </div>
+      {/* ===== EMAIL SUBSCRIBE — always visible, sticky below hero ===== */}
+      <div
+        className="email-subscribe-bar"
+        data-testid="email-subscribe"
+        style={{
+          background: "var(--bg-surface)",
+          borderBottom: "1px solid var(--border-subtle)",
+          padding: "var(--space-base) var(--space-lg)",
+          textAlign: "center",
+          position: "sticky",
+          top: 0,
+          zIndex: 50,
+        }}
+      >
+        <div style={{ maxWidth: 960, margin: "0 auto" }}>
+          {subStatus === "success" ? (
+            <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", margin: 0 }}>{subMsg}</p>
+          ) : (
+            <>
+              <p style={{ margin: "0 0 var(--space-sm)", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-primary)" }}>
+                Get notified when tickets drop
+              </p>
+              <form onSubmit={handleSubscribe} style={{ display: "flex", gap: "var(--space-sm)", maxWidth: 480, margin: "0 auto", flexWrap: "wrap", justifyContent: "center" }}>
+                <input
+                  type="email"
+                  value={subEmail}
+                  onChange={(e) => setSubEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  style={{ flex: 1, minWidth: 200 }}
+                />
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={subStatus === "loading" || !subEmail}
+                >
+                  {subStatus === "loading" ? "Subscribing..." : "Notify me"}
+                </button>
+                <div ref={turnstileRef} style={{ width: "100%", display: "flex", justifyContent: "center", marginTop: "var(--space-xs)" }} />
+                {subStatus === "error" && (
+                  <p style={{ width: "100%", color: "var(--accent)", fontSize: "var(--text-xs)", margin: "var(--space-xs) 0 0" }}>{subMsg}</p>
+                )}
+              </form>
+            </>
+          )}
         </div>
-      )}
+      </div>
 
       {/* ===== MAIN CONTENT ===== */}
       <main style={{ maxWidth: 960, margin: "0 auto", padding: "0 var(--space-lg)" }}>
