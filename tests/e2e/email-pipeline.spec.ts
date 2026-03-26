@@ -25,15 +25,31 @@ const FUTURE_DATE = "2099-04-03";
 const TEST_EMAIL = `e2e-pipeline-test-${Date.now()}@example.com`;
 
 /**
+ * Return a unique fake IP to avoid rate limiting across test groups.
+ * The rate limiter uses x-forwarded-for as the client identifier.
+ */
+function fakeIP(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+  const oct = Math.abs(hash) % 254 + 1;
+  return `10.0.${Math.abs(hash >> 8) % 254}.${oct}`;
+}
+
+/**
  * POST /api/subscribe with the given body.
+ * Uses a fake IP derived from the test name to avoid rate limiting.
  */
 async function postSubscribe(
   request: APIRequestContext,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  ip = "192.168.99.99"
 ) {
   return request.post("/api/subscribe", {
     data: body,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-Forwarded-For": ip,
+    },
   });
 }
 
@@ -42,8 +58,11 @@ async function postSubscribe(
    ========================================================================= */
 
 test.describe("4.1 Subscribe — email validation", () => {
+  // Each test uses a unique fake IP to stay under the 5 req/min rate limit
+  const IP = fakeIP("4.1-subscribe-validation");
+
   test("missing email returns 400", async ({ request }) => {
-    const resp = await postSubscribe(request, { dates: [FUTURE_DATE] });
+    const resp = await postSubscribe(request, { dates: [FUTURE_DATE] }, IP);
     expect(resp.status()).toBe(400);
     const body = await resp.json();
     expect(body).toHaveProperty("error");
@@ -54,7 +73,7 @@ test.describe("4.1 Subscribe — email validation", () => {
     const resp = await postSubscribe(request, {
       email: "not-an-email",
       dates: [FUTURE_DATE],
-    });
+    }, fakeIP("4.1-invalid-email"));
     expect(resp.status()).toBe(400);
     const body = await resp.json();
     expect(body.error).toMatch(/email/i);
@@ -64,7 +83,7 @@ test.describe("4.1 Subscribe — email validation", () => {
     const resp = await postSubscribe(request, {
       email: "",
       dates: [FUTURE_DATE],
-    });
+    }, fakeIP("4.1-empty-email"));
     expect(resp.status()).toBe(400);
     const body = await resp.json();
     expect(body.error).toMatch(/email/i);
@@ -82,7 +101,7 @@ test.describe("4.2 Subscribe — date validation", () => {
     const resp = await postSubscribe(request, {
       email: TEST_EMAIL,
       dates: ["2020-01-01", "2021-06-15"],
-    });
+    }, fakeIP("4.2-past-dates"));
     expect(resp.status()).toBe(400);
     const body = await resp.json();
     expect(body.error).toMatch(/no valid dates/i);
@@ -96,7 +115,7 @@ test.describe("4.2 Subscribe — date validation", () => {
     const resp = await postSubscribe(request, {
       email: `regression-date-${Date.now()}@example.com`,
       dates: [FUTURE_DATE], // 2099-04-03 is far outside old hardcoded range
-    });
+    }, fakeIP("4.2-regression-date"));
     // Should succeed (200) or dev-mode succeed, NOT 400
     const body = await resp.json();
     expect(body).not.toHaveProperty("error", expect.stringMatching(/no valid dates/i));
@@ -109,7 +128,7 @@ test.describe("4.2 Subscribe — date validation", () => {
     const resp = await postSubscribe(request, {
       email: `mixed-dates-${Date.now()}@example.com`,
       dates: ["2020-01-01", FUTURE_DATE],
-    });
+    }, fakeIP("4.2-mixed-dates"));
     // Should succeed because FUTURE_DATE is valid
     const body = await resp.json();
     expect(resp.status()).toBe(200);
@@ -119,7 +138,7 @@ test.describe("4.2 Subscribe — date validation", () => {
   test("no dates array at all returns 400", async ({ request }) => {
     const resp = await postSubscribe(request, {
       email: TEST_EMAIL,
-    });
+    }, fakeIP("4.2-no-dates"));
     expect(resp.status()).toBe(400);
     const body = await resp.json();
     expect(body.error).toMatch(/no valid dates/i);
@@ -135,7 +154,7 @@ test.describe("4.3 Subscribe — success response shape", () => {
     const resp = await postSubscribe(request, {
       email: `success-${Date.now()}@example.com`,
       dates: [FUTURE_DATE],
-    });
+    }, fakeIP("4.3-subscribe-success"));
     expect(resp.status()).toBe(200);
     const body = await resp.json();
     expect(body.success).toBe(true);
@@ -240,7 +259,7 @@ test.describe("4.7 Subscribe → Check pipeline", () => {
     const subResp = await postSubscribe(request, {
       email: `pipeline-${Date.now()}@example.com`,
       dates: [FUTURE_DATE],
-    });
+    }, fakeIP("4.7-pipeline"));
     expect(subResp.status()).toBe(200);
     const subBody = await subResp.json();
     expect(subBody.success).toBe(true);
