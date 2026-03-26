@@ -168,6 +168,8 @@ test.describe("4.3 Subscribe — success response shape", () => {
    ========================================================================= */
 
 test.describe("4.4 Check endpoint — auth guard", () => {
+  // The correct-secret test actually runs the check pipeline (scrapes AMC); allow extra time
+  test.setTimeout(60000);
   test("GET /api/check with no secret → 401", async ({ request }) => {
     const resp = await request.get("/api/check");
     expect(resp.status()).toBe(401);
@@ -192,6 +194,8 @@ test.describe("4.4 Check endpoint — auth guard", () => {
    ========================================================================= */
 
 test.describe("4.5 Check endpoint — dev mode response", () => {
+  // /api/check scrapes AMC in background; allow extra time
+  test.setTimeout(90000);
   test("response includes a log array", async ({ request }) => {
     const resp = await request.get("/api/check?secret=hailmary");
     expect(resp.status()).toBe(200);
@@ -236,6 +240,7 @@ test.describe("4.5 Check endpoint — dev mode response", () => {
    ========================================================================= */
 
 test.describe("4.6 Check endpoint — POST method", () => {
+  test.setTimeout(60000);
   test("POST /api/check without secret query param → still runs (POST is cron-triggered)", async ({
     request,
   }) => {
@@ -252,6 +257,7 @@ test.describe("4.6 Check endpoint — POST method", () => {
    ========================================================================= */
 
 test.describe("4.7 Subscribe → Check pipeline", () => {
+  test.setTimeout(90000);
   test("subscribe then check — check returns 200 with log showing subscriber context", async ({
     request,
   }) => {

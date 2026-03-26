@@ -1491,7 +1491,7 @@ export default function Home() {
   const theaterList = useMemo(
     () =>
       selectedTheaters.map((slug) => {
-        const data = status?.theaters[slug];
+        const data = status?.theaters?.[slug];
         return {
           slug,
           name: data?.name || slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
@@ -1510,8 +1510,8 @@ export default function Home() {
     }
   }, [bestCombo?.theaterSlug, bestCombo?.formatTag]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const currentTheaterData = status?.theaters[selectedTheater];
-  const currentFormatData = currentTheaterData?.formats[selectedFormat];
+  const currentTheaterData = status?.theaters?.[selectedTheater];
+  const currentFormatData = currentTheaterData?.formats?.[selectedFormat];
 
   const startOver = () => {
     setStep("setup-theaters");
