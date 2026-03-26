@@ -418,22 +418,32 @@ test.describe("3.6 Compare Mode vs Card Mode Consistency", () => {
   test("compare mode shows same showtime IDs as card mode", async ({ page }) => {
     await loadMocked(page);
 
-    // Collect IDs from card mode (both theaters visible separately)
-    // Switch to Empire 25 to get all card-mode IDs for IMAX
+    // Compare mode shows ALL formats × ALL theaters.
+    // Collect card-mode IDs by iterating every format for every theater.
     const formatGroup = page.getByRole("group", { name: "Format selector" });
-    await formatGroup.getByText("IMAX", { exact: true }).click();
-    await page.waitForTimeout(200);
-
-    // Get Lincoln Square IMAX IDs
-    const idsLincoln = await visibleIds(page);
-
-    // Switch to Empire 25
     const tabs = page.getByRole("tablist", { name: "Theater selector" });
-    await tabs.getByRole("tab").nth(1).click();
-    await page.waitForTimeout(200);
-    const idsEmpire = await visibleIds(page);
+    const allCardModeIds = new Set<string>();
 
-    const cardModeIds = new Set([...idsLincoln, ...idsEmpire]);
+    const formatLabels: Array<{ label: string; exact?: boolean }> = [
+      { label: "IMAX 70mm" },
+      { label: "Dolby Cinema" },
+      { label: "IMAX", exact: true },
+    ];
+
+    for (const { label, exact } of formatLabels) {
+      await formatGroup.getByText(label, exact ? { exact: true } : {}).click();
+      await page.waitForTimeout(200);
+
+      // Lincoln Square (tab 0)
+      await tabs.getByRole("tab").nth(0).click();
+      await page.waitForTimeout(200);
+      (await visibleIds(page)).forEach((id) => allCardModeIds.add(id));
+
+      // Empire 25 (tab 1)
+      await tabs.getByRole("tab").nth(1).click();
+      await page.waitForTimeout(200);
+      (await visibleIds(page)).forEach((id) => allCardModeIds.add(id));
+    }
 
     // Enable compare mode
     await page.getByText("Compare all").click();
@@ -449,12 +459,12 @@ test.describe("3.6 Compare Mode vs Card Mode Consistency", () => {
     }
 
     // Every card-mode ID should appear in compare mode
-    for (const id of cardModeIds) {
+    for (const id of allCardModeIds) {
       expect(compareModeIds.has(id)).toBe(true);
     }
     // And vice versa
     for (const id of compareModeIds) {
-      expect(cardModeIds.has(id)).toBe(true);
+      expect(allCardModeIds.has(id)).toBe(true);
     }
   });
 
