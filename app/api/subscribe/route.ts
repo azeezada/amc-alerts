@@ -14,8 +14,15 @@ export async function POST(request: NextRequest) {
   if (limited) return limited;
 
   try {
-    const body = (await request.json()) as { email?: string; dates?: string[]; turnstileToken?: string };
-    const { email, dates, turnstileToken } = body;
+    const body = (await request.json()) as {
+      email?: string;
+      dates?: string[];
+      turnstileToken?: string;
+      movieSlug?: string;
+      movieTitle?: string;
+      theaterSlugs?: string[];
+    };
+    const { email, dates, turnstileToken, movieSlug, movieTitle, theaterSlugs } = body;
 
     // Verify Turnstile token if provided (skip in dev)
     if (turnstileToken) {
@@ -57,8 +64,12 @@ export async function POST(request: NextRequest) {
     const env = await getCfEnv();
     const db: D1Database | undefined = env.DB;
 
+    const subMovieSlug = movieSlug || "project-hail-mary-76779";
+    const subMovieTitle = movieTitle || "Project Hail Mary";
+    const subTheaterSlugs = theaterSlugs && theaterSlugs.length > 0 ? theaterSlugs : null;
+
     if (!db) {
-      console.log(`[DEV] Would subscribe: ${email} for dates: ${selectedDates.join(", ")}`);
+      console.log(`[DEV] Would subscribe: ${email} for dates: ${selectedDates.join(", ")}, movie: ${subMovieSlug}, theaters: ${subTheaterSlugs?.join(", ") ?? "all"}`);
       return NextResponse.json({
         success: true,
         message: "You're on the list! We'll email you the moment tickets drop.",
@@ -80,8 +91,8 @@ export async function POST(request: NextRequest) {
         });
       } else {
         await db
-          .prepare("UPDATE subscribers SET active = 1, dates = ?, subscribed_at = datetime('now') WHERE email = ?")
-          .bind(JSON.stringify(selectedDates), email)
+          .prepare("UPDATE subscribers SET active = 1, dates = ?, movie_slug = ?, movie_title = ?, theater_slugs = ?, subscribed_at = datetime('now') WHERE email = ?")
+          .bind(JSON.stringify(selectedDates), subMovieSlug, subMovieTitle, subTheaterSlugs ? JSON.stringify(subTheaterSlugs) : null, email)
           .run();
         return NextResponse.json({
           success: true,
@@ -91,8 +102,8 @@ export async function POST(request: NextRequest) {
     }
 
     await db
-      .prepare("INSERT INTO subscribers (email, dates) VALUES (?, ?)")
-      .bind(email, JSON.stringify(selectedDates))
+      .prepare("INSERT INTO subscribers (email, dates, movie_slug, movie_title, theater_slugs) VALUES (?, ?, ?, ?, ?)")
+      .bind(email, JSON.stringify(selectedDates), subMovieSlug, subMovieTitle, subTheaterSlugs ? JSON.stringify(subTheaterSlugs) : null)
       .run();
 
     return NextResponse.json({
