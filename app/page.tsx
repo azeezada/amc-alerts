@@ -293,6 +293,7 @@ function DateCard({
   return (
     <div
       className="card card-enter"
+      data-testid={`date-card-${date}`}
       style={
         {
           "--i": index,
@@ -1206,6 +1207,8 @@ function DateSetup({
   useEffect(() => {
     if (startDate && endDate && startDate <= endDate) {
       onSelect(generateDateRange(startDate, endDate));
+    } else if (startDate && endDate && startDate > endDate) {
+      onSelect([]);
     }
   }, [startDate, endDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
