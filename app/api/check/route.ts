@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkAllTheatersAndFormats, DateResult, TARGET_DATES, THEATERS, FORMATS } from "@/lib/scraper";
+import { checkAllTheatersAndFormats, DateResult, TARGET_DATES, THEATERS, FORMATS, DEFAULT_MOVIE_SLUG } from "@/lib/scraper";
 import { buildEmailHtml, buildEmailText } from "@/lib/email";
 import { getCfEnv, type D1Database } from "@/lib/cf-env";
 import { generateUnsubscribeToken } from "@/lib/unsubscribe-token";
@@ -16,18 +16,23 @@ interface SubscriberRow {
   dates: string;
 }
 
-function makeKey(theaterSlug: string, formatTag: string, date: string) {
-  return `${theaterSlug}__${formatTag}__${date}`;
+function makeKey(theaterSlug: string, formatTag: string, date: string, movieSlug: string) {
+  return `${movieSlug}__${theaterSlug}__${formatTag}__${date}`;
 }
 
 async function sendEmailViaResend(
   to: string,
   newDates: DateResult[],
-  resendApiKey: string
+  resendApiKey: string,
+  movieTitle?: string,
+  theaterName?: string
 ) {
   const unsubscribeToken = await generateUnsubscribeToken(to);
-  const html = buildEmailHtml(newDates, unsubscribeToken, to);
-  const text = buildEmailText(newDates);
+  const html = buildEmailHtml(newDates, unsubscribeToken, to, movieTitle, theaterName);
+  const text = buildEmailText(newDates, movieTitle, theaterName);
+  const subject = movieTitle
+    ? `🎬 Tickets Available — ${movieTitle}`
+    : "🎬 IMAX Tickets Available";
 
   const resp = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -38,7 +43,7 @@ async function sendEmailViaResend(
     body: JSON.stringify({
       from: "IMAX Alerts <alerts@churnrecovery.com>",
       to,
-      subject: "🎬 Tickets Available — Project Hail Mary",
+      subject,
       html,
       text,
     }),
@@ -98,7 +103,7 @@ async function runCheck(_request: NextRequest) {
           logLine(`${theaterSlug}/${formatTag}/${date}: ${dateResult.showtimes.length} showtime(s)`);
 
           if (db) {
-            const key = makeKey(theaterSlug, formatTag, date);
+            const key = makeKey(theaterSlug, formatTag, date, DEFAULT_MOVIE_SLUG);
             let cached: CacheRow | null = null;
             try {
               cached = await db
@@ -131,7 +136,7 @@ async function runCheck(_request: NextRequest) {
 
             // Update cache
             try {
-              const key2 = makeKey(theaterSlug, formatTag, date);
+              const key2 = makeKey(theaterSlug, formatTag, date, DEFAULT_MOVIE_SLUG);
               await db
                 .prepare(
                   "INSERT OR REPLACE INTO showtime_cache_v2 (cache_key, data, checked_at) VALUES (?, ?, datetime('now'))"

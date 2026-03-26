@@ -3,8 +3,12 @@ import { DateResult, formatDateNice } from "./scraper";
 export function buildEmailHtml(
   newDates: DateResult[],
   unsubscribeToken?: string,
-  email?: string
+  email?: string,
+  movieTitle?: string,
+  theaterName?: string
 ): string {
+  const displayMovie = movieTitle || "IMAX Showtime";
+  const displayTheater = theaterName || "AMC Theatres";
   const dateRows = newDates
     .map((d) => {
       const showtimeRows = d.showtimes
@@ -70,7 +74,7 @@ export function buildEmailHtml(
         🎬 IMAX 70mm Tickets Available
       </h1>
       <p style="color:#9ca3af;margin:8px 0 0;">
-        Project Hail Mary · AMC Lincoln Square 13 · New York City
+        ${displayMovie} · ${displayTheater}
       </p>
     </div>
 
@@ -98,10 +102,16 @@ export function buildEmailHtml(
 </html>`;
 }
 
-export function buildEmailText(newDates: DateResult[]): string {
+export function buildEmailText(
+  newDates: DateResult[],
+  movieTitle?: string,
+  theaterName?: string
+): string {
+  const displayMovie = movieTitle || "IMAX Showtime";
+  const displayTheater = theaterName || "AMC Theatres";
   const lines: string[] = [
-    "🎬 IMAX 70mm Tickets Available — Project Hail Mary",
-    "AMC Lincoln Square 13 · New York City",
+    `🎬 IMAX 70mm Tickets Available — ${displayMovie}`,
+    `${displayTheater}`,
     "",
   ];
 

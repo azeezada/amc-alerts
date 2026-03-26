@@ -102,11 +102,17 @@ describe("buildEmailHtml", () => {
     expect(single).toContain("1 date");
   });
 
-  it("BUG: hardcodes 'Project Hail Mary' regardless of actual movie", () => {
-    // This test documents the hardcoded movie/theater bug
-    expect(html).toContain("Project Hail Mary");
-    expect(html).toContain("AMC Lincoln Square 13");
-    // These values are hardcoded in the template — they should be parameterized
+  it("uses dynamic movie title and theater name when provided", () => {
+    const custom = buildEmailHtml(sampleDates, undefined, undefined, "Mission Impossible", "AMC Empire 25");
+    expect(custom).toContain("Mission Impossible");
+    expect(custom).toContain("AMC Empire 25");
+    expect(custom).not.toContain("Project Hail Mary");
+  });
+
+  it("falls back to generic strings when movie/theater not provided", () => {
+    const fallback = buildEmailHtml(sampleDates);
+    expect(fallback).toContain("IMAX Showtime");
+    expect(fallback).toContain("AMC Theatres");
   });
 });
 
@@ -133,8 +139,16 @@ describe("buildEmailText", () => {
     expect(text).toContain("https://www.amctheatres.com/showtimes/140840300");
   });
 
-  it("BUG: hardcodes 'Project Hail Mary' in plain text too", () => {
-    expect(text).toContain("Project Hail Mary");
-    expect(text).toContain("AMC Lincoln Square 13");
+  it("uses dynamic movie title and theater name in plain text", () => {
+    const custom = buildEmailText(sampleDates, "Mission Impossible", "AMC Empire 25");
+    expect(custom).toContain("Mission Impossible");
+    expect(custom).toContain("AMC Empire 25");
+    expect(custom).not.toContain("Project Hail Mary");
+  });
+
+  it("falls back to generic strings when movie/theater not provided", () => {
+    const fallback = buildEmailText(sampleDates);
+    expect(fallback).toContain("IMAX Showtime");
+    expect(fallback).toContain("AMC Theatres");
   });
 });

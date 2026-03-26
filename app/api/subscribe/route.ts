@@ -41,14 +41,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validDates = [
-      "2026-04-01", "2026-04-02", "2026-04-03", "2026-04-04", "2026-04-05",
-    ];
-
+    const today = new Date().toISOString().split("T")[0];
     const selectedDates =
       dates && dates.length > 0
-        ? dates.filter((d) => validDates.includes(d))
-        : validDates;
+        ? dates.filter((d) => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) && d >= today)
+        : [];
 
     if (selectedDates.length === 0) {
       return NextResponse.json(
