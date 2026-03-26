@@ -1913,7 +1913,29 @@ export default function Home() {
             {/* Loading skeleton */}
             {loadingStatus && !status && <ResultsSkeleton />}
 
-            {/* Date cards grid */}
+            {/* Not playing here — format key absent for this theater in the API response */}
+            {status && !currentFormatData && (
+              <div
+                data-testid="not-playing-here"
+                style={{
+                  textAlign: "center",
+                  padding: "var(--space-2xl) var(--space-lg)",
+                  color: "var(--text-tertiary)",
+                }}
+              >
+                <div style={{ fontSize: 32, marginBottom: "var(--space-base)" }}>🎭</div>
+                <div style={{ fontSize: "var(--text-base)", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "var(--space-sm)" }}>
+                  Not playing here
+                </div>
+                <div style={{ fontSize: "var(--text-sm)", lineHeight: "var(--leading-normal)" }}>
+                  {FORMAT_LIST.find((f) => f.tag === selectedFormat)?.label ?? selectedFormat} is not
+                  available at this theater.
+                </div>
+              </div>
+            )}
+
+            {/* Date cards grid — only when format exists for this theater */}
+            {currentFormatData && (
             <div
               style={{
                 display: "grid",
@@ -1926,11 +1948,12 @@ export default function Home() {
                 <DateCard
                   key={`${selectedTheater}-${selectedFormat}-${date}`}
                   date={date}
-                  result={currentFormatData?.dates[date]}
+                  result={currentFormatData.dates[date]}
                   index={i}
                 />
               ))}
             </div>
+            )}
             </>
             )}
 
