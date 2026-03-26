@@ -375,3 +375,10 @@ input[type="checkbox"] {
     --text-2xl: 1.5rem;
   }
 }
+
+/* Email subscribe bar — sticky on mobile, static on desktop */
+@media (min-width: 641px) {
+  .email-subscribe-bar {
+    position: relative !important;
+  }
+}
