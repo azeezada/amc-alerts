@@ -18,11 +18,6 @@ export interface DateResult {
   error?: string;
 }
 
-export interface StatusResult {
-  dates: Record<string, DateResult>;
-  checkedAt: string;
-}
-
 export interface TheaterFormatResult {
   dates: Record<string, DateResult>;
 }
@@ -319,24 +314,6 @@ export async function checkDate(
     date,
     available: showtimes.length > 0,
     showtimes,
-  };
-}
-
-/** Check all dates for a single theater+format (backward-compat). */
-export async function checkAllDates(
-  theaterSlug = "amc-lincoln-square-13",
-  formatTag = "imax70mm"
-): Promise<StatusResult> {
-  const results: Record<string, DateResult> = {};
-
-  for (const date of TARGET_DATES) {
-    results[date] = await checkDate(date, theaterSlug, formatTag);
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-
-  return {
-    dates: results,
-    checkedAt: new Date().toISOString(),
   };
 }
 
