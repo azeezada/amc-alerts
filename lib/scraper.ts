@@ -42,6 +42,8 @@ export interface MovieInfo {
   slug: string;
   title: string;
   formats: string[];
+  poster?: string;
+  description?: string;
 }
 
 /* -------------------------------------------------------------------------

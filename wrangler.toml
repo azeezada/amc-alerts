@@ -10,3 +10,4 @@ database_id = "8e643a96-458b-44db-a66e-df4654f8fd76"
 
 [vars]
 # RESEND_API_KEY = set via wrangler pages secret
+TMDB_API_KEY = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJlNDE1NWE4ZGZlMGNjOWY2MzllNjE2MmFhNzEyYmU3NCIsIm5iZiI6MTc3NDQwODcwNy4xNzgsInN1YiI6IjY5YzM1NDAzZjE0MTFkMDk1YmEyNTJjNyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.Sk1i4K7jRcjC_o9LjBA32YRqeVvFdnc-89X5Vmkvc1M"
