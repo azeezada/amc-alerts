@@ -14,6 +14,9 @@ interface CacheRow {
 interface SubscriberRow {
   email: string;
   dates: string;
+  movie_slug: string | null;
+  movie_title: string | null;
+  theater_slugs: string | null;
 }
 
 function makeKey(theaterSlug: string, formatTag: string, date: string, movieSlug: string) {
@@ -89,8 +92,8 @@ async function runCheck(_request: NextRequest) {
     const result = await checkAllTheatersAndFormats();
     logLine(`Fetched ${THEATERS.length} theaters × ${FORMATS.length} formats × ${TARGET_DATES.length} dates`);
 
-    // Collect newly-available date results across all theater+format combos
-    const newlyAvailable: DateResult[] = [];
+    // Track newly-available results per theater for subscriber-scoped filtering
+    const newlyAvailableByTheater: Record<string, DateResult[]> = {};
 
     for (const [theaterSlug, theaterData] of Object.entries(result.theaters)) {
       for (const [formatTag, formatData] of Object.entries(theaterData.formats)) {
@@ -114,88 +117,127 @@ async function runCheck(_request: NextRequest) {
               // Table may not exist yet
             }
 
+            let isNew = false;
             if (!cached) {
               logLine(`  → NEW (not in cache)`);
-              newlyAvailable.push(dateResult);
+              isNew = true;
             } else {
               const prevData = JSON.parse(cached.data) as DateResult;
               if (!prevData.available || prevData.showtimes.length === 0) {
                 logLine(`  → NEW (was unavailable before)`);
-                newlyAvailable.push(dateResult);
+                isNew = true;
               } else {
                 const prevIds = new Set(prevData.showtimes.map((s) => s.id));
                 const newIds = dateResult.showtimes.filter((s) => !prevIds.has(s.id));
                 if (newIds.length > 0) {
                   logLine(`  → ${newIds.length} new showtime(s) added`);
-                  newlyAvailable.push(dateResult);
+                  isNew = true;
                 } else {
                   logLine(`  → Already known, no changes`);
                 }
               }
             }
 
+            if (isNew) {
+              if (!newlyAvailableByTheater[theaterSlug]) newlyAvailableByTheater[theaterSlug] = [];
+              newlyAvailableByTheater[theaterSlug].push(dateResult);
+            }
+
             // Update cache
             try {
-              const key2 = makeKey(theaterSlug, formatTag, date, DEFAULT_MOVIE_SLUG);
               await db
                 .prepare(
                   "INSERT OR REPLACE INTO showtime_cache_v2 (cache_key, data, checked_at) VALUES (?, ?, datetime('now'))"
                 )
-                .bind(key2, JSON.stringify(dateResult))
+                .bind(key, JSON.stringify(dateResult))
                 .run();
             } catch (_) {
               // Ignore cache write failures
             }
           } else {
-            newlyAvailable.push(dateResult);
+            if (!newlyAvailableByTheater[theaterSlug]) newlyAvailableByTheater[theaterSlug] = [];
+            newlyAvailableByTheater[theaterSlug].push(dateResult);
           }
         }
       }
     }
 
-    logLine(`Newly available: ${newlyAvailable.length} showtime entries`);
+    const totalNewEntries = Object.values(newlyAvailableByTheater).reduce((sum, arr) => sum + arr.length, 0);
+    logLine(`Newly available: ${totalNewEntries} showtime entries across ${Object.keys(newlyAvailableByTheater).length} theater(s)`);
 
-    if (newlyAvailable.length === 0) {
+    if (totalNewEntries === 0) {
       return NextResponse.json({ log, notified: 0, newDates: [] });
     }
 
     if (!db) {
       logLine("[DEV] No DB — skipping notifications");
+      const allDates = Object.values(newlyAvailableByTheater).flat().map((d) => d.date);
       return NextResponse.json({
         log,
         notified: 0,
-        newDates: newlyAvailable.map((d) => d.date),
+        newDates: [...new Set(allDates)],
         devMode: true,
       });
     }
 
     if (!resendApiKey) {
       logLine("No RESEND_API_KEY set — skipping email");
+      const allDates = Object.values(newlyAvailableByTheater).flat().map((d) => d.date);
       return NextResponse.json({
         log,
         notified: 0,
-        newDates: newlyAvailable.map((d) => d.date),
+        newDates: [...new Set(allDates)],
         error: "No RESEND_API_KEY",
       });
     }
 
     const { results: subscribers } = await db
-      .prepare("SELECT email, dates FROM subscribers WHERE active = 1")
+      .prepare("SELECT email, dates, movie_slug, movie_title, theater_slugs FROM subscribers WHERE active = 1")
       .all<SubscriberRow>();
 
     logLine(`Total active subscribers: ${subscribers.length}`);
 
     let notified = 0;
     for (const sub of subscribers) {
+      // Filter by movie: only notify subscriber if the checked movie matches theirs
+      const subMovieSlug = sub.movie_slug || DEFAULT_MOVIE_SLUG;
+      if (subMovieSlug !== DEFAULT_MOVIE_SLUG) {
+        logLine(`  ⊘ Skip ${sub.email}: subscribed for ${subMovieSlug}, checking ${DEFAULT_MOVIE_SLUG}`);
+        continue;
+      }
+
+      // Filter by theater: if subscriber has theater preferences, only include those
+      const subTheaterSlugs: string[] = sub.theater_slugs ? JSON.parse(sub.theater_slugs) : [];
+      const relevantTheaterSlugs = subTheaterSlugs.length === 0
+        ? Object.keys(newlyAvailableByTheater)
+        : subTheaterSlugs.filter((slug) => newlyAvailableByTheater[slug]?.length > 0);
+
+      if (relevantTheaterSlugs.length === 0) {
+        logLine(`  ⊘ Skip ${sub.email}: no new showtimes at subscribed theater(s)`);
+        continue;
+      }
+
+      // Filter by dates
       const subDates: string[] = JSON.parse(sub.dates || "[]");
-      const relevantDates = newlyAvailable.filter(
-        (d) => subDates.length === 0 || subDates.includes(d.date)
-      );
+      const relevantDates: DateResult[] = [];
+      for (const theaterSlug of relevantTheaterSlugs) {
+        for (const dr of newlyAvailableByTheater[theaterSlug] || []) {
+          if (subDates.length === 0 || subDates.includes(dr.date)) {
+            relevantDates.push(dr);
+          }
+        }
+      }
 
       if (relevantDates.length === 0) continue;
 
+      // Build theater name for email
+      const theaterName = relevantTheaterSlugs.length === 1
+        ? (THEATERS.find((t) => t.slug === relevantTheaterSlugs[0])?.name ?? relevantTheaterSlugs[0])
+        : `${relevantTheaterSlugs.length} AMC theaters`;
+      const movieTitle = sub.movie_title || undefined;
+
       try {
-        await sendEmailViaResend(sub.email, relevantDates, resendApiKey);
+        await sendEmailViaResend(sub.email, relevantDates, resendApiKey, movieTitle, theaterName);
         await db
           .prepare(
             "UPDATE subscribers SET notified_at = datetime('now') WHERE email = ?"
@@ -203,18 +245,19 @@ async function runCheck(_request: NextRequest) {
           .bind(sub.email)
           .run();
         notified++;
-        logLine(`  ✓ Notified: ${sub.email}`);
+        logLine(`  ✓ Notified: ${sub.email} (${movieTitle ?? DEFAULT_MOVIE_SLUG} @ ${theaterName})`);
       } catch (e) {
         logLine(`  ✗ Failed to notify ${sub.email}: ${e}`);
       }
       await new Promise((r) => setTimeout(r, 100));
     }
 
+    const allNewDates = [...new Set(Object.values(newlyAvailableByTheater).flat().map((d) => d.date))];
     logLine(`=== Done. Notified ${notified} subscribers ===`);
     return NextResponse.json({
       log,
       notified,
-      newDates: newlyAvailable.map((d) => d.date),
+      newDates: allNewDates,
     });
   } catch (e) {
     logLine(`ERROR: ${e}`);
