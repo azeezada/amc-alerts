@@ -199,6 +199,158 @@ describe("2.3 Cache Key Format — No Collision", () => {
 });
 
 /* -------------------------------------------------------------------------
+   2.3b Gap 1.2 — Movie-Found-But-Format-Absent Branch
+
+   Covers the branch at scraper.ts line 384:
+     if (!section || !section.toLowerCase().includes(format.tag))
+
+   When `section` is non-null (movie IS on the page) but the format tag
+   is absent from that movie's section, the result must be:
+     { available: false, showtimes: [], error: undefined }
+   — distinct from a fetch failure (which sets error: "Fetch failed").
+   ------------------------------------------------------------------------- */
+
+function makeMovieSectionForFixture(
+  movieSlug: string,
+  movieTitle: string,
+  showtimeHtml: string
+): string {
+  return `
+    <section class="ShowtimesMovieSection">
+      <h2><a href="/movies/${movieSlug}">${movieTitle}</a></h2>
+      <div class="showtimes">${showtimeHtml}</div>
+    </section>`;
+}
+
+function makeShowtimeAnchorForFixture(
+  id: string,
+  time: string,
+  amPm: string,
+  formatTag: string,
+  movieSlug: string
+): string {
+  const describedBy = `${movieSlug} ${movieSlug}-amc-lincoln-square-13 ${movieSlug}-amc-lincoln-square-13-${formatTag}`;
+  return `<a aria-describedby="${describedBy}" id="${id}" href="/showtimes/${id}">${time}<!-- -->${amPm.toLowerCase()}</a>`;
+}
+
+describe("2.3b Gap 1.2 — Movie-Found-But-Format-Absent Branch", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("movie present on page but requested format absent → available=false with no error field", async () => {
+    // Build a page where "project-hail-mary-76779" ONLY has imax70mm (no dolbycinema).
+    const imax70mmOnly = makeMovieSectionForFixture(
+      "project-hail-mary-76779",
+      "Project Hail Mary",
+      makeShowtimeAnchorForFixture("100", "7:00", "PM", "imax70mm", "project-hail-mary-76779")
+    );
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => imax70mmOnly,
+    } as Response);
+
+    const result = await checkAllTheatersAndFormats({
+      theaters: [{ slug: "amc-lincoln-square-13", name: "AMC Lincoln Square", neighborhood: "Upper West Side" }],
+      dates: ["2026-04-03"],
+      movieSlug: "project-hail-mary-76779",
+      formats: [{ tag: "dolbycinema", label: "Dolby Cinema", priority: 2 }],
+    });
+
+    const dateEntry = result.theaters["amc-lincoln-square-13"].formats["dolbycinema"].dates["2026-04-03"];
+    expect(dateEntry.available).toBe(false);
+    expect(dateEntry.showtimes).toHaveLength(0);
+    // Crucially: no error field — this is "format absent", NOT a fetch failure
+    expect(dateEntry.error).toBeUndefined();
+  });
+
+  it("movie present but format absent vs movie absent — both return available=false, only movie-absent lacks showtimes", async () => {
+    // Page has only imax70mm for PHM; no dolbycinema, no other movies
+    const imax70mmOnly = makeMovieSectionForFixture(
+      "project-hail-mary-76779",
+      "Project Hail Mary",
+      makeShowtimeAnchorForFixture("101", "3:00", "PM", "imax70mm", "project-hail-mary-76779")
+    );
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => imax70mmOnly,
+    } as Response);
+
+    // Test format-absent: PHM exists but dolbycinema is absent
+    const formatAbsent = await checkAllTheatersAndFormats({
+      theaters: [{ slug: "amc-lincoln-square-13", name: "AMC Lincoln Square", neighborhood: "Upper West Side" }],
+      dates: ["2026-04-03"],
+      movieSlug: "project-hail-mary-76779",
+      formats: [{ tag: "dolbycinema", label: "Dolby Cinema", priority: 2 }],
+    });
+    vi.restoreAllMocks();
+
+    // Test movie-absent: nonexistent movie slug
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => imax70mmOnly,
+    } as Response);
+    const movieAbsent = await checkAllTheatersAndFormats({
+      theaters: [{ slug: "amc-lincoln-square-13", name: "AMC Lincoln Square", neighborhood: "Upper West Side" }],
+      dates: ["2026-04-03"],
+      movieSlug: "nonexistent-movie-99999",
+      formats: [{ tag: "imax70mm", label: "IMAX 70mm", priority: 1 }],
+    });
+
+    const formatAbsentEntry = formatAbsent.theaters["amc-lincoln-square-13"].formats["dolbycinema"].dates["2026-04-03"];
+    const movieAbsentEntry = movieAbsent.theaters["amc-lincoln-square-13"].formats["imax70mm"].dates["2026-04-03"];
+
+    // Both should be unavailable with no showtimes
+    expect(formatAbsentEntry.available).toBe(false);
+    expect(formatAbsentEntry.showtimes).toHaveLength(0);
+    expect(movieAbsentEntry.available).toBe(false);
+    expect(movieAbsentEntry.showtimes).toHaveLength(0);
+
+    // Neither should have an error (errors come from fetch failures, not missing content)
+    expect(formatAbsentEntry.error).toBeUndefined();
+    expect(movieAbsentEntry.error).toBeUndefined();
+  });
+
+  it("format present for one movie, absent for another on same page — correct scoping", async () => {
+    // PHM has imax70mm only; Thunderbolts has dolbycinema only
+    const mixedPage = [
+      makeMovieSectionForFixture(
+        "project-hail-mary-76779",
+        "Project Hail Mary",
+        makeShowtimeAnchorForFixture("200", "7:00", "PM", "imax70mm", "project-hail-mary-76779")
+      ),
+      makeMovieSectionForFixture(
+        "thunderbolts-99999",
+        "Thunderbolts",
+        makeShowtimeAnchorForFixture("300", "8:00", "PM", "dolbycinema", "thunderbolts-99999")
+      ),
+    ].join("");
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => mixedPage,
+    } as Response);
+
+    // Check PHM for dolbycinema — format absent for PHM even though dolbycinema is on page (for another movie)
+    const result = await checkAllTheatersAndFormats({
+      theaters: [{ slug: "amc-lincoln-square-13", name: "AMC Lincoln Square", neighborhood: "Upper West Side" }],
+      dates: ["2026-04-03"],
+      movieSlug: "project-hail-mary-76779",
+      formats: [{ tag: "dolbycinema", label: "Dolby Cinema", priority: 2 }],
+    });
+
+    const entry = result.theaters["amc-lincoln-square-13"].formats["dolbycinema"].dates["2026-04-03"];
+    expect(entry.available).toBe(false);
+    expect(entry.showtimes).toHaveLength(0);
+    expect(entry.error).toBeUndefined();
+  });
+});
+
+/* -------------------------------------------------------------------------
    2.4 Partial Failure Reporting
    ------------------------------------------------------------------------- */
 
