@@ -1,0 +1,79 @@
+name: AMC Canary — Daily HTML Structure Check
+
+on:
+  schedule:
+    # 7am UTC daily (3am ET) — before peak traffic
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+    # Allow manual trigger from GitHub Actions UI
+
+jobs:
+  canary:
+    name: AMC Live HTML Canary
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run AMC canary tests
+        id: canary
+        run: npx playwright test --config playwright.unit.config.ts tests/canary/
+        # No browser install needed — canary uses fetch(), not page fixtures
+
+      - name: Create GitHub issue on failure
+        if: failure() && steps.canary.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const today = new Date().toISOString().split('T')[0];
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            // Check if an open issue for today already exists (avoid duplicates)
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'canary-failure',
+              state: 'open',
+            });
+
+            const alreadyOpen = issues.some(i => i.title.includes(today));
+            if (alreadyOpen) {
+              console.log('Issue already open for today — skipping creation');
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 AMC HTML Structure Changed — Scraper May Be Broken [${today}]`,
+              labels: ['bug', 'canary-failure'],
+              body: [
+                `The daily AMC canary test failed on **${today}**.`,
+                '',
+                'This means the AMC website HTML structure may have changed and our regex parsers in `lib/scraper.ts` are broken.',
+                '',
+                '**What to check:**',
+                '- `aria-describedby` anchor pattern on showtime links',
+                '- `/movies/{slug}` href format',
+                '- Numeric showtime IDs in `/showtimes/{id}` hrefs',
+                '- CAPTCHA / bot-blocking response',
+                '',
+                '**How to fix:**',
+                '1. Run `npm run test:canary` locally to see which assertions fail',
+                '2. Fetch a live AMC page and compare HTML to `tests/fixtures/`',
+                '3. Update regex patterns in `lib/scraper.ts` as needed',
+                '4. Re-run `npm run test:unit` + integration tests to verify fix',
+                '',
+                `**Workflow run:** ${runUrl}`,
+              ].join('\n'),
+            });
