@@ -181,6 +181,46 @@ function extractFormatShowtimes(html: string, formatTag: string): Showtime[] {
 }
 
 /**
+ * Extract the HTML slice that belongs to a specific movie's section.
+ *
+ * AMC showtimes pages render multiple movies sequentially. Each movie section
+ * begins where its `/movies/{slug}` link first appears and ends just before
+ * the next *different* movie's link. Scoping to this slice prevents showtime
+ * anchors from other movies (which may share the same format tag) from being
+ * included in results for the wrong movie.
+ *
+ * Returns null if the movie slug is not found in the HTML.
+ */
+export function extractMovieSection(html: string, movieSlug: string): string | null {
+  const movieLinkRegex = /href="\/movies\/([a-z0-9-]+)"/gi;
+
+  interface Occurrence { slug: string; index: number }
+  const occurrences: Occurrence[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = movieLinkRegex.exec(html)) !== null) {
+    occurrences.push({ slug: m[1], index: m.index });
+  }
+
+  // Find the first occurrence of our target movie
+  const firstTarget = occurrences.find((o) => o.slug === movieSlug);
+  if (!firstTarget) return null;
+
+  const sectionStart = firstTarget.index;
+
+  // Section ends just before the first *different* movie link that appears
+  // after our section starts.
+  let sectionEnd = html.length;
+  for (const occ of occurrences) {
+    if (occ.index > sectionStart && occ.slug !== movieSlug) {
+      sectionEnd = occ.index;
+      break;
+    }
+  }
+
+  return html.slice(sectionStart, sectionEnd);
+}
+
+/**
  * Extract ALL movies from an AMC showtimes page.
  * AMC pages have movie sections with links like /movies/{slug}
  */
@@ -236,15 +276,17 @@ export async function checkDate(
     return { date, available: false, showtimes: [], error: "Fetch failed" };
   }
 
-  if (!html.includes(movieSlug)) {
+  // Scope to the target movie's section to avoid mixing showtimes from other movies.
+  const section = extractMovieSection(html, movieSlug);
+  if (!section) {
     return { date, available: false, showtimes: [] };
   }
 
-  if (!html.toLowerCase().includes(formatTag)) {
+  if (!section.toLowerCase().includes(formatTag)) {
     return { date, available: false, showtimes: [] };
   }
 
-  const showtimes = extractFormatShowtimes(html, formatTag);
+  const showtimes = extractFormatShowtimes(section, formatTag);
   return {
     date,
     available: showtimes.length > 0,
@@ -307,13 +349,16 @@ export async function checkAllTheatersAndFormats(opts?: {
 
         if (!html) {
           container[date] = { date, available: false, showtimes: [], error: "Fetch failed" };
-        } else if (!html.includes(movieSlug)) {
-          container[date] = { date, available: false, showtimes: [] };
-        } else if (!html.toLowerCase().includes(format.tag)) {
-          container[date] = { date, available: false, showtimes: [] };
         } else {
-          const showtimes = extractFormatShowtimes(html, format.tag);
-          container[date] = { date, available: showtimes.length > 0, showtimes };
+          // Scope to the target movie's section so we never return another
+          // movie's showtimes even when they share the same format tag.
+          const section = extractMovieSection(html, movieSlug);
+          if (!section || !section.toLowerCase().includes(format.tag)) {
+            container[date] = { date, available: false, showtimes: [] };
+          } else {
+            const showtimes = extractFormatShowtimes(section, format.tag);
+            container[date] = { date, available: showtimes.length > 0, showtimes };
+          }
         }
       }
 
