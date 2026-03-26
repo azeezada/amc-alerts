@@ -512,6 +512,105 @@ describe("1.9 Timezone Date Handling", () => {
 });
 
 /* =========================================================================
+   5.1 HTML Fixture: No-Format Movies → "standard" Fallback
+   ========================================================================= */
+
+describe("5.1 Standard format fallback (no imax70mm/dolbycinema/imax tags)", () => {
+  const fixtureStandard = loadFixture("amc-no-formats-standard-fallback.html");
+
+  it('movie with no recognized format tags gets formats: ["standard"]', () => {
+    const movies = extractMoviesFromPage(fixtureStandard);
+    expect(movies.length).toBe(2);
+    const regular = movies.find((m) => m.slug === "regular-feature-99001");
+    expect(regular).toBeDefined();
+    expect(regular!.formats).toEqual(["standard"]);
+  });
+
+  it("standard fallback is ONLY pushed when no other formats found (no imax70mm alongside)", () => {
+    const movies = extractMoviesFromPage(fixtureStandard);
+    for (const m of movies) {
+      expect(m.formats).toContain("standard");
+      expect(m.formats).not.toContain("imax70mm");
+      expect(m.formats).not.toContain("dolbycinema");
+      expect(m.formats).not.toContain("imax");
+    }
+  });
+
+  it("both no-format movies extracted and both get standard fallback", () => {
+    const movies = extractMoviesFromPage(fixtureStandard);
+    const slugs = movies.map((m) => m.slug);
+    expect(slugs).toContain("regular-feature-99001");
+    expect(slugs).toContain("another-regular-film-99100");
+    for (const m of movies) {
+      expect(m.formats).toEqual(["standard"]);
+    }
+  });
+});
+
+/* =========================================================================
+   5.2 HTML Fixture: Special-Character Movie Titles
+   ========================================================================= */
+
+describe("5.2 Special-character movie titles", () => {
+  const fixtureSpecial = loadFixture("amc-special-char-titles.html");
+
+  it("all 4 special-char movies extracted without crash", () => {
+    const movies = extractMoviesFromPage(fixtureSpecial);
+    expect(movies.length).toBe(4);
+  });
+
+  it("movie with colon in title extracted correctly", () => {
+    const movies = extractMoviesFromPage(fixtureSpecial);
+    const m = movies.find((m) => m.slug === "mission-impossible-75000");
+    expect(m).toBeDefined();
+    expect(m!.title).toBe("Mission: Impossible");
+  });
+
+  it("movie with HTML-encoded apostrophe: title captured as raw HTML entity", () => {
+    // The regex ([^<]+) captures literal HTML without entity decoding.
+    // This documents the current behavior: apostrophes appear as &#39;
+    const movies = extractMoviesFromPage(fixtureSpecial);
+    const m = movies.find((m) => m.slug === "its-whats-inside-76000");
+    expect(m).toBeDefined();
+    expect(m!.title).toContain("&#39;");
+  });
+
+  it("movie with HTML-encoded ampersand: title captured as raw HTML entity", () => {
+    const movies = extractMoviesFromPage(fixtureSpecial);
+    const m = movies.find((m) => m.slug === "pride-and-prejudice-77000");
+    expect(m).toBeDefined();
+    expect(m!.title).toContain("&amp;");
+  });
+
+  it("no duplicate slugs in special-char fixture", () => {
+    const movies = extractMoviesFromPage(fixtureSpecial);
+    const slugs = movies.map((m) => m.slug);
+    expect(new Set(slugs).size).toBe(slugs.length);
+  });
+});
+
+/* =========================================================================
+   5.3 HTML Fixture: Empty / Zero-Movie AMC Page
+   ========================================================================= */
+
+describe("5.3 Empty AMC page (no showtimes, no movies)", () => {
+  const fixtureEmpty = loadFixture("amc-empty-page.html");
+
+  it("extractMoviesFromPage returns [] on empty page", () => {
+    expect(extractMoviesFromPage(fixtureEmpty)).toEqual([]);
+  });
+
+  it("extractMovieSection returns null on empty page", () => {
+    expect(extractMovieSection(fixtureEmpty, "any-movie-slug")).toBeNull();
+  });
+
+  it("extractFormatShowtimes returns [] on empty page", () => {
+    expect(extractFormatShowtimes(fixtureEmpty, "imax70mm")).toEqual([]);
+    expect(extractFormatShowtimes(fixtureEmpty, "dolbycinema")).toEqual([]);
+  });
+});
+
+/* =========================================================================
    Additional: Real fixture cross-validation
    ========================================================================= */
 
