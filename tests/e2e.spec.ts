@@ -10,14 +10,14 @@ test.describe("Setup Flow", () => {
     await expect(page.getByRole("heading", { name: /select theaters/i })).toBeVisible();
   });
 
-  test("2. Select NYC market — theaters appear", async ({ page }) => {
+  test("2. Curated theater list is immediately visible", async ({ page }) => {
     await page.goto("/");
-    // Click New York City market button
-    await page.getByTestId("market-new-york-city").click();
-    // Theater options should appear
+    // Theater options should be immediately visible (no market selector needed)
     await expect(page.getByTestId("theater-options")).toBeVisible();
-    // Should see Lincoln Square
+    // Should see all three curated NYC theaters
     await expect(page.getByTestId("theater-amc-lincoln-square-13")).toBeVisible();
+    await expect(page.getByTestId("theater-amc-empire-25")).toBeVisible();
+    await expect(page.getByTestId("theater-amc-kips-bay-15")).toBeVisible();
   });
 
   test("3. Select a theater — next button becomes enabled", async ({ page }) => {
@@ -26,8 +26,7 @@ test.describe("Setup Flow", () => {
     const nextBtn = page.getByTestId("theater-next");
     await expect(nextBtn).toBeDisabled();
 
-    // Select NYC and a theater
-    await page.getByTestId("market-new-york-city").click();
+    // Select a theater from the curated list
     await page.getByTestId("theater-amc-lincoln-square-13").click();
 
     // Next button should be enabled now
@@ -36,7 +35,6 @@ test.describe("Setup Flow", () => {
 
   test("4. Navigate to movie step — movies load", async ({ page }) => {
     await page.goto("/");
-    await page.getByTestId("market-new-york-city").click();
     await page.getByTestId("theater-amc-lincoln-square-13").click();
     await page.getByTestId("theater-next").click();
 
@@ -116,9 +114,9 @@ test.describe("Setup Flow", () => {
     await expect(page.getByTestId("setup-flow")).toBeVisible();
     await expect(page.getByTestId("theater-setup")).toBeVisible();
 
-    // Market buttons should be visible and tappable
-    await page.getByTestId("market-new-york-city").click();
+    // Theater options should be immediately visible (no market step needed)
     await expect(page.getByTestId("theater-options")).toBeVisible();
+    await expect(page.getByTestId("theater-amc-lincoln-square-13")).toBeVisible();
   });
 });
 

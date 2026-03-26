@@ -44,13 +44,6 @@ interface TheaterInfo {
   hasImax70mm?: boolean;
 }
 
-interface MarketInfo {
-  slug: string;
-  name: string;
-  state: string;
-  theaterCount: number;
-}
-
 interface MovieInfo {
   slug: string;
   title: string;
@@ -425,6 +418,8 @@ function DateCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-red"
+                data-testid={`buy-tickets-${st.id}`}
+                data-showtime-id={st.id}
                 style={{ padding: "7px 16px", fontSize: "var(--text-sm)" }}
               >
                 Buy tickets
@@ -637,6 +632,8 @@ function ComparisonGrid({
                                 href={st.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                data-testid={`buy-tickets-${st.id}`}
+                                data-showtime-id={st.id}
                                 style={{
                                   display: "inline-block",
                                   padding: "4px 8px",
@@ -741,7 +738,16 @@ function FormatPills({
 }
 
 /* =========================================================================
-   SETUP FLOW — Step 1: Market + Theater Selection
+   CURATED THEATER LIST — NYC
+   ========================================================================= */
+const CURATED_THEATERS: TheaterInfo[] = [
+  { slug: "amc-lincoln-square-13", name: "AMC Lincoln Square 13", neighborhood: "Upper West Side", hasImax70mm: true },
+  { slug: "amc-empire-25", name: "AMC Empire 25", neighborhood: "Times Square", hasImax70mm: false },
+  { slug: "amc-kips-bay-15", name: "AMC Kips Bay 15", neighborhood: "Kips Bay", hasImax70mm: false },
+];
+
+/* =========================================================================
+   SETUP FLOW — Step 1: Theater Selection
    ========================================================================= */
 function TheaterSetup({
   selectedTheaters,
@@ -752,48 +758,11 @@ function TheaterSetup({
   onSelect: (theaters: string[]) => void;
   onNext: () => void;
 }) {
-  const [markets, setMarkets] = useState<MarketInfo[]>([]);
-  const [selectedMarket, setSelectedMarket] = useState<string>("");
-  const [theaterOptions, setTheaterOptions] = useState<TheaterInfo[]>([]);
-  const [customSlug, setCustomSlug] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch("/api/theaters")
-      .then((r) => r.json())
-      .then((data: { markets: MarketInfo[] }) => {
-        setMarkets(data.markets || []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (!selectedMarket) {
-      setTheaterOptions([]);
-      return;
-    }
-    fetch(`/api/theaters?market=${selectedMarket}`)
-      .then((r) => r.json())
-      .then((data: { theaters: TheaterInfo[] }) => {
-        setTheaterOptions(data.theaters || []);
-      })
-      .catch(() => setTheaterOptions([]));
-  }, [selectedMarket]);
-
   const toggleTheater = (slug: string) => {
     if (selectedTheaters.includes(slug)) {
       onSelect(selectedTheaters.filter((s) => s !== slug));
     } else {
       onSelect([...selectedTheaters, slug]);
-    }
-  };
-
-  const addCustom = () => {
-    const slug = customSlug.trim().toLowerCase().replace(/\s+/g, "-");
-    if (slug && !selectedTheaters.includes(slug)) {
-      onSelect([...selectedTheaters, slug]);
-      setCustomSlug("");
     }
   };
 
@@ -816,214 +785,69 @@ function TheaterSetup({
           margin: "0 0 var(--space-lg)",
         }}
       >
-        Choose a market, then pick the theaters you want to track.
+        Choose the theaters you want to track.
       </p>
 
-      {/* Market selector */}
-      <div style={{ marginBottom: "var(--space-lg)" }}>
-        <label
-          style={{
-            display: "block",
-            fontSize: "var(--text-xs)",
-            fontWeight: 600,
-            color: "var(--text-secondary)",
-            marginBottom: "var(--space-xs)",
-            textTransform: "uppercase",
-            letterSpacing: "0.5px",
-          }}
-        >
-          Market
-        </label>
-        {loading ? (
-          <div className="skeleton" style={{ height: 44, width: "100%" }} />
-        ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-sm)" }}>
-            {markets.map((m) => (
-              <button
-                key={m.slug}
-                data-testid={`market-${m.slug}`}
-                onClick={() => setSelectedMarket(m.slug)}
+      <div
+        style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginBottom: "var(--space-lg)" }}
+        data-testid="theater-options"
+      >
+        {CURATED_THEATERS.map((t) => {
+          const isSelected = selectedTheaters.includes(t.slug);
+          return (
+            <button
+              key={t.slug}
+              data-testid={`theater-${t.slug}`}
+              onClick={() => toggleTheater(t.slug)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "var(--space-md) var(--space-base)",
+                borderRadius: 8,
+                border: `1.5px solid ${isSelected ? "var(--accent)" : "var(--border-subtle)"}`,
+                background: isSelected ? "var(--accent-subtle)" : "var(--bg-surface)",
+                color: "var(--text-primary)",
+                fontFamily: "inherit",
+                fontSize: "var(--text-sm)",
+                cursor: "pointer",
+                transition: "all var(--dur-fast) var(--ease-default)",
+                textAlign: "left",
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 700 }}>{t.name}</div>
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginTop: 2 }}>
+                  {t.neighborhood}
+                  {t.hasImax70mm && (
+                    <span style={{ color: "var(--accent)", marginLeft: 8, fontWeight: 700 }}>
+                      IMAX 70mm
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div
                 style={{
-                  padding: "var(--space-sm) var(--space-base)",
-                  borderRadius: 8,
-                  border: `1.5px solid ${selectedMarket === m.slug ? "var(--accent)" : "var(--border-subtle)"}`,
-                  background: selectedMarket === m.slug ? "var(--bg-elevated)" : "transparent",
-                  color: selectedMarket === m.slug ? "var(--text-primary)" : "var(--text-secondary)",
-                  fontFamily: "inherit",
-                  fontSize: "var(--text-sm)",
-                  fontWeight: selectedMarket === m.slug ? 700 : 500,
-                  cursor: "pointer",
-                  transition: "all var(--dur-fast) var(--ease-default)",
-                }}
-              >
-                {m.name}, {m.state}
-                <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginLeft: 6 }}>
-                  {m.theaterCount}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Theater options */}
-      {theaterOptions.length > 0 && (
-        <div style={{ marginBottom: "var(--space-lg)" }} data-testid="theater-options">
-          <label
-            style={{
-              display: "block",
-              fontSize: "var(--text-xs)",
-              fontWeight: 600,
-              color: "var(--text-secondary)",
-              marginBottom: "var(--space-sm)",
-              textTransform: "uppercase",
-              letterSpacing: "0.5px",
-            }}
-          >
-            Theaters in {markets.find((m) => m.slug === selectedMarket)?.name}
-          </label>
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
-            {theaterOptions.map((t) => {
-              const isSelected = selectedTheaters.includes(t.slug);
-              return (
-                <button
-                  key={t.slug}
-                  data-testid={`theater-${t.slug}`}
-                  onClick={() => toggleTheater(t.slug)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "var(--space-md) var(--space-base)",
-                    borderRadius: 8,
-                    border: `1.5px solid ${isSelected ? "var(--accent)" : "var(--border-subtle)"}`,
-                    background: isSelected ? "var(--accent-subtle)" : "var(--bg-surface)",
-                    color: "var(--text-primary)",
-                    fontFamily: "inherit",
-                    fontSize: "var(--text-sm)",
-                    cursor: "pointer",
-                    transition: "all var(--dur-fast) var(--ease-default)",
-                    textAlign: "left",
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 700 }}>{t.name}</div>
-                    <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginTop: 2 }}>
-                      {t.neighborhood}
-                      {t.hasImax70mm && (
-                        <span style={{ color: "var(--accent)", marginLeft: 8, fontWeight: 700 }}>
-                          IMAX 70mm
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: 4,
-                      border: `2px solid ${isSelected ? "var(--accent)" : "var(--border-default)"}`,
-                      background: isSelected ? "var(--accent)" : "transparent",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "white",
-                      fontSize: 14,
-                      fontWeight: 800,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {isSelected ? "\u2713" : ""}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Custom slug input */}
-      <div style={{ marginBottom: "var(--space-lg)" }}>
-        <label
-          style={{
-            display: "block",
-            fontSize: "var(--text-xs)",
-            fontWeight: 600,
-            color: "var(--text-secondary)",
-            marginBottom: "var(--space-xs)",
-            textTransform: "uppercase",
-            letterSpacing: "0.5px",
-          }}
-        >
-          Or add a custom AMC theater slug
-        </label>
-        <div style={{ display: "flex", gap: "var(--space-sm)" }}>
-          <input
-            type="text"
-            value={customSlug}
-            onChange={(e) => setCustomSlug(e.target.value)}
-            placeholder="e.g. amc-metreon-16"
-            onKeyDown={(e) => e.key === "Enter" && addCustom()}
-            style={{ flex: 1 }}
-          />
-          <button className="btn-ghost" onClick={addCustom} type="button">
-            Add
-          </button>
-        </div>
-      </div>
-
-      {/* Selected theaters */}
-      {selectedTheaters.length > 0 && (
-        <div style={{ marginBottom: "var(--space-lg)" }}>
-          <div
-            style={{
-              fontSize: "var(--text-xs)",
-              fontWeight: 600,
-              color: "var(--text-secondary)",
-              marginBottom: "var(--space-sm)",
-              textTransform: "uppercase",
-              letterSpacing: "0.5px",
-            }}
-          >
-            Selected ({selectedTheaters.length})
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-sm)" }}>
-            {selectedTheaters.map((slug) => (
-              <span
-                key={slug}
-                style={{
-                  display: "inline-flex",
+                  width: 24,
+                  height: 24,
+                  borderRadius: 4,
+                  border: `2px solid ${isSelected ? "var(--accent)" : "var(--border-default)"}`,
+                  background: isSelected ? "var(--accent)" : "transparent",
+                  display: "flex",
                   alignItems: "center",
-                  gap: 6,
-                  background: "var(--accent-subtle)",
-                  border: "1px solid var(--accent)",
-                  borderRadius: 6,
-                  padding: "4px 10px",
-                  fontSize: "var(--text-xs)",
-                  fontWeight: 600,
-                  color: "var(--text-primary)",
+                  justifyContent: "center",
+                  color: "white",
+                  fontSize: 14,
+                  fontWeight: 800,
+                  flexShrink: 0,
                 }}
               >
-                {slug}
-                <button
-                  onClick={() => onSelect(selectedTheaters.filter((s) => s !== slug))}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "var(--text-tertiary)",
-                    cursor: "pointer",
-                    padding: 0,
-                    fontSize: 16,
-                    lineHeight: 1,
-                  }}
-                >
-                  &times;
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+                {isSelected ? "\u2713" : ""}
+              </div>
+            </button>
+          );
+        })}
+      </div>
 
       <button
         className="btn-primary"
@@ -1637,6 +1461,56 @@ export default function Home() {
         </div>
       </header>
 
+      {/* ===== EMAIL SUBSCRIBE — prominent position below hero ===== */}
+      {step === "results" && (
+        <div
+          className="email-subscribe-bar"
+          data-testid="email-subscribe"
+          style={{
+            background: "var(--bg-surface)",
+            borderBottom: "1px solid var(--border-subtle)",
+            padding: "var(--space-base) var(--space-lg)",
+            textAlign: "center",
+            position: "sticky",
+            top: 0,
+            zIndex: 50,
+          }}
+        >
+          <div style={{ maxWidth: 960, margin: "0 auto" }}>
+            {subStatus === "success" ? (
+              <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", margin: 0 }}>{subMsg}</p>
+            ) : (
+              <>
+                <p style={{ margin: "0 0 var(--space-sm)", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-primary)" }}>
+                  Get notified when tickets drop
+                </p>
+                <form onSubmit={handleSubscribe} style={{ display: "flex", gap: "var(--space-sm)", maxWidth: 480, margin: "0 auto", flexWrap: "wrap", justifyContent: "center" }}>
+                  <input
+                    type="email"
+                    value={subEmail}
+                    onChange={(e) => setSubEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    required
+                    style={{ flex: 1, minWidth: 200 }}
+                  />
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={subStatus === "loading" || !subEmail}
+                  >
+                    {subStatus === "loading" ? "Subscribing..." : "Notify me"}
+                  </button>
+                  <div ref={turnstileRef} style={{ width: "100%", display: "flex", justifyContent: "center", marginTop: "var(--space-xs)" }} />
+                  {subStatus === "error" && (
+                    <p style={{ width: "100%", color: "var(--accent)", fontSize: "var(--text-xs)", margin: "var(--space-xs) 0 0" }}>{subMsg}</p>
+                  )}
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ===== MAIN CONTENT ===== */}
       <main style={{ maxWidth: 960, margin: "0 auto", padding: "0 var(--space-lg)" }}>
         {/* ===== SETUP FLOW ===== */}
@@ -1953,109 +1827,8 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* Trailer */}
-              <div className="card" style={{ padding: "var(--space-lg)" }}>
-                <h3 style={{ margin: "0 0 var(--space-base)", fontSize: 18, fontWeight: 600, color: "var(--text-primary)" }}>
-                  Official Trailer
-                </h3>
-                <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: 8, overflow: "hidden", background: "var(--bg-elevated)" }}>
-                  <iframe
-                    src="https://www.youtube.com/embed/QCLXO7mCpbA"
-                    title="Project Hail Mary — Official Trailer"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
-                  />
-                </div>
-              </div>
-
-              {/* Why IMAX 70mm */}
-              <div className="card" style={{ padding: "var(--space-lg)" }}>
-                <h3 style={{ margin: "0 0 var(--space-base)", fontSize: 18, fontWeight: 600, color: "var(--text-primary)" }}>
-                  Why IMAX 70mm?
-                </h3>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "var(--space-lg)" }}>
-                  <div>
-                    <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>
-                      18K Resolution Equivalent
-                    </div>
-                    <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: "var(--leading-normal)" }}>
-                      IMAX 70mm film captures roughly 18,000 lines of horizontal resolution — far exceeding
-                      any digital format. Every frame contains extraordinary detail.
-                    </p>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>
-                      1.43:1 Aspect Ratio
-                    </div>
-                    <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: "var(--leading-normal)" }}>
-                      IMAX 70mm fills the entire screen vertically — 40% more image than standard widescreen.
-                      You see what the director intended, not a cropped version.
-                    </p>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>
-                      Analog Film Look
-                    </div>
-                    <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: "var(--leading-normal)" }}>
-                      Real photochemical film has organic grain, richer colors, and a cinematic depth
-                      that digital projection cannot replicate. This is how movies were meant to look.
-                    </p>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>
-                      Only 3 NYC Screens
-                    </div>
-                    <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: "var(--leading-normal)" }}>
-                      True IMAX 70mm projectors are rare — only AMC Lincoln Square has one in NYC.
-                      These screenings sell out fast and may run for a limited time.
-                    </p>
-                  </div>
-                </div>
-              </div>
             </div>
 
-            {/* ===== EMAIL SUBSCRIBE ===== */}
-            <div
-              className="card"
-              style={{
-                padding: "var(--space-lg)",
-                marginTop: "var(--space-2xl)",
-                textAlign: "center",
-              }}
-            >
-              <h3 style={{ margin: "0 0 var(--space-sm)", fontSize: 18, fontWeight: 600, color: "var(--text-primary)" }}>
-                Get notified when tickets drop
-              </h3>
-              <p style={{ margin: "0 0 var(--space-base)", fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
-                We&apos;ll email you the moment new showtimes become available.
-              </p>
-              {subStatus === "success" ? (
-                <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)" }}>{subMsg}</p>
-              ) : (
-                <form onSubmit={handleSubscribe} style={{ display: "flex", gap: "var(--space-sm)", maxWidth: 480, margin: "0 auto", flexWrap: "wrap" }}>
-                  <input
-                    type="email"
-                    value={subEmail}
-                    onChange={(e) => setSubEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    required
-                    style={{ flex: 1, minWidth: 200 }}
-                  />
-                  <button
-                    type="submit"
-                    className="btn-primary"
-                    disabled={subStatus === "loading" || !subEmail}
-                  >
-                    {subStatus === "loading" ? "Subscribing..." : "Notify me"}
-                  </button>
-                  <div ref={turnstileRef} style={{ width: "100%", display: "flex", justifyContent: "center", marginTop: "var(--space-sm)" }} />
-                  {subStatus === "error" && (
-                    <p style={{ width: "100%", color: "var(--accent)", fontSize: "var(--text-xs)", margin: "var(--space-sm) 0 0" }}>{subMsg}</p>
-                  )}
-                </form>
-              )}
-            </div>
           </section>
         )}
 

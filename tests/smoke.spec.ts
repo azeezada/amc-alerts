@@ -47,15 +47,14 @@ test.describe("Setup Flow — Theater Selection", () => {
     await expect(page.getByText("Select Theaters")).toBeVisible();
   });
 
-  test("market buttons load from API", async ({ page }) => {
+  test("curated theater list is visible without market selection", async ({ page }) => {
     await page.goto("/");
-    // Wait for markets to load (skeleton disappears)
-    await page.waitForTimeout(3000);
-    // Should have at least one market button (may fail if API is down)
-    const body = await page.textContent("body");
-    // Markets include NYC, LA, etc.
-    const hasMarket = body?.includes("New York") || body?.includes("Los Angeles") || body?.includes("Chicago");
-    expect(hasMarket).toBeTruthy();
+    // Theater list should be immediately visible
+    await expect(page.getByTestId("theater-options")).toBeVisible();
+    // Should show the three curated NYC theaters by name
+    await expect(page.getByTestId("theater-amc-lincoln-square-13")).toBeVisible();
+    await expect(page.getByTestId("theater-amc-empire-25")).toBeVisible();
+    await expect(page.getByTestId("theater-amc-kips-bay-15")).toBeVisible();
   });
 
   test("Next button is disabled when no theaters selected", async ({ page }) => {
@@ -64,9 +63,12 @@ test.describe("Setup Flow — Theater Selection", () => {
     await expect(nextBtn).toBeDisabled();
   });
 
-  test("custom theater slug input is present", async ({ page }) => {
+  test("no custom theater slug input — only curated list", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByPlaceholder("e.g. amc-metreon-16")).toBeVisible();
+    // Should NOT have a free-text slug input
+    await expect(page.getByPlaceholder("e.g. amc-metreon-16")).not.toBeVisible();
+    // Should show curated theater buttons instead
+    await expect(page.getByTestId("theater-options")).toBeVisible();
   });
 });
 
