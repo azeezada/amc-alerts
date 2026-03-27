@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { MARKETS, POPULAR_THEATERS } from "@/lib/theaters";
+import { MARKETS, POPULAR_THEATERS, getAmenityBadge } from "@/lib/theaters";
 
 /* =========================================================================
    Types
@@ -44,6 +44,7 @@ interface TheaterInfo {
   name: string;
   neighborhood: string;
   hasImax70mm?: boolean;
+  amenities?: string[];
 }
 
 interface MovieInfo {
@@ -1339,6 +1340,7 @@ function TheaterSetup({
     name: t.name,
     neighborhood: t.neighborhood,
     hasImax70mm: t.hasImax70mm,
+    amenities: t.amenities,
   }));
 
   const toggleTheater = (slug: string) => {
@@ -1435,7 +1437,7 @@ function TheaterSetup({
                 textAlign: "left",
               }}
             >
-              <div>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700 }}>{t.name}</div>
                 <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginTop: 2 }}>
                   {t.neighborhood}
@@ -1445,6 +1447,33 @@ function TheaterSetup({
                     </span>
                   )}
                 </div>
+                {t.amenities && t.amenities.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                    {t.amenities.slice(0, 3).map((amenity, i) => {
+                      const badge = getAmenityBadge(amenity);
+                      return (
+                        <span
+                          key={i}
+                          style={{
+                            background: badge.bg,
+                            border: `1px solid ${badge.color}44`,
+                            borderRadius: 12,
+                            padding: "2px 8px",
+                            fontSize: 10,
+                            color: badge.color,
+                            fontWeight: 600,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 3,
+                          }}
+                        >
+                          <span>{badge.icon}</span>
+                          {badge.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <div
                 style={{

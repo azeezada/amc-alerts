@@ -599,3 +599,41 @@ export function getTheaterBySlug(theaterSlug: string): TheaterInfo | null {
   }
   return null;
 }
+
+export interface AmenityBadge {
+  icon: string;
+  label: string;
+  /** CSS color for the badge text/border */
+  color: string;
+  /** CSS background for the badge */
+  bg: string;
+}
+
+/** Map an amenity string to an icon + color badge. Falls back to a neutral style. */
+export function getAmenityBadge(amenity: string): AmenityBadge {
+  const a = amenity.toLowerCase();
+
+  if (a.includes("imax 70mm"))
+    return { icon: "🎬", label: amenity, color: "#8888ff", bg: "#1a1a2e" };
+  if (a.includes("dolby"))
+    return { icon: "🔊", label: amenity, color: "#66aaff", bg: "#0f1a2e" };
+  if (a.includes("imax"))
+    return { icon: "📽", label: amenity, color: "#aaaaff", bg: "#1a1a2e" };
+
+  if (a.includes("recliner"))
+    return { icon: "🪑", label: amenity, color: "#55cc88", bg: "#0e2018" };
+  if (a.includes("reserved seating") || a.includes("reserved"))
+    return { icon: "🎫", label: amenity, color: "#88ccaa", bg: "#0e1e16" };
+
+  if (a.includes("full bar") || (a.includes("bar") && !a.includes("candy")))
+    return { icon: "🍺", label: amenity, color: "#ffbb44", bg: "#2a1e00" };
+  if (a.includes("dine-in") || a.includes("dine in") || a.includes("dining"))
+    return { icon: "🍽", label: amenity, color: "#ff9955", bg: "#2a1200" };
+  if (a.includes("food ordering") || a.includes("food"))
+    return { icon: "🍿", label: amenity, color: "#ffcc66", bg: "#221a00" };
+  if (a.includes("macguffin") || a.includes("lounge"))
+    return { icon: "🍸", label: amenity, color: "#ffbb44", bg: "#2a1e00" };
+
+  // Default
+  return { icon: "✓", label: amenity, color: "var(--text-secondary)", bg: "var(--bg-base)" };
+}

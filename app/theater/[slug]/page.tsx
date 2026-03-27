@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { getTheaterBySlug, getMarketForTheater, MARKETS } from "../../../lib/theaters";
+import { getTheaterBySlug, getMarketForTheater, MARKETS, getAmenityBadge } from "../../../lib/theaters";
 
 export default function TheaterInfoPage() {
   const params = useParams();
@@ -307,22 +307,30 @@ export default function TheaterInfoPage() {
                 gap: "var(--space-sm)",
               }}
             >
-              {theater.amenities.map((amenity, i) => (
-                <span
-                  key={i}
-                  style={{
-                    background: "var(--bg-base)",
-                    border: "1px solid var(--border-default, #333333)",
-                    borderRadius: 16,
-                    padding: "4px 12px",
-                    fontSize: "var(--text-xs)",
-                    color: "var(--text-secondary)",
-                    fontWeight: 500,
-                  }}
-                >
-                  {amenity}
-                </span>
-              ))}
+              {theater.amenities.map((amenity, i) => {
+                const badge = getAmenityBadge(amenity);
+                return (
+                  <span
+                    key={i}
+                    data-testid="amenity-badge"
+                    style={{
+                      background: badge.bg,
+                      border: `1px solid ${badge.color}44`,
+                      borderRadius: 16,
+                      padding: "4px 12px",
+                      fontSize: "var(--text-xs)",
+                      color: badge.color,
+                      fontWeight: 600,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 5,
+                    }}
+                  >
+                    <span style={{ fontSize: "0.85em" }}>{badge.icon}</span>
+                    {badge.label}
+                  </span>
+                );
+              })}
             </div>
           </div>
         )}
