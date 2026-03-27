@@ -36,10 +36,11 @@ async function sendEmailViaResend(
   newDates: DateResult[],
   resendApiKey: string,
   movieTitle?: string,
-  theaterName?: string
+  theaterName?: string,
+  runId?: string
 ) {
   const unsubscribeToken = await generateUnsubscribeToken(to);
-  const html = buildEmailHtml(newDates, unsubscribeToken, to, movieTitle, theaterName);
+  const html = buildEmailHtml(newDates, unsubscribeToken, to, movieTitle, theaterName, runId);
   const text = buildEmailText(newDates, movieTitle, theaterName);
   const subject = movieTitle
     ? `🎬 Tickets Available — ${movieTitle}`
@@ -153,11 +154,12 @@ async function runCheck(_request: NextRequest) {
               }
 
               let isNew = false;
+              let prevData: DateResult | null = null;
               if (!cached) {
                 logLine(`  → NEW (not in cache)`);
                 isNew = true;
               } else {
-                const prevData = JSON.parse(cached.data) as DateResult;
+                prevData = JSON.parse(cached.data) as DateResult;
                 if (!prevData.available || prevData.showtimes.length === 0) {
                   logLine(`  → NEW (was unavailable before)`);
                   isNew = true;
@@ -171,6 +173,31 @@ async function runCheck(_request: NextRequest) {
                     logLine(`  → Already known, no changes`);
                   }
                 }
+              }
+
+              // Detect and log status transitions (Sellable→AlmostFull→SoldOut) per showtime
+              try {
+                const prevStatusMap = new Map<string, string>();
+                if (prevData?.showtimes) {
+                  for (const s of prevData.showtimes) {
+                    prevStatusMap.set(s.id, s.status);
+                  }
+                }
+                for (const showtime of dateResult.showtimes) {
+                  const prevStatus = prevStatusMap.get(showtime.id) ?? null;
+                  const curStatus = showtime.status;
+                  if (prevStatus !== curStatus) {
+                    await db
+                      .prepare(
+                        "INSERT INTO showtime_status_history (showtime_id, movie_slug, showtime_date, theater_slug, format_tag, showtime_time, from_status, to_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                      )
+                      .bind(showtime.id, movieSlug, date, theaterSlug, formatTag, `${showtime.time} ${showtime.amPm}`, prevStatus, curStatus)
+                      .run();
+                    logLine(`  ↪ Status change: ${showtime.id} ${prevStatus ?? "NEW"} → ${curStatus}`);
+                  }
+                }
+              } catch (_) {
+                // Table may not exist yet on old deployments
               }
 
               if (isNew) {
@@ -307,7 +334,7 @@ async function runCheck(_request: NextRequest) {
         try {
           const channel = sub.notification_channel || "email";
           if (channel === "email" || channel === "both") {
-            await sendEmailViaResend(sub.email, relevantDates, resendApiKey, movieTitle, theaterName);
+            await sendEmailViaResend(sub.email, relevantDates, resendApiKey, movieTitle, theaterName, runId);
           }
           if ((channel === "sms" || channel === "both") && sub.phone_number) {
             await sendSmsAlert(sub.phone_number, relevantDates, {

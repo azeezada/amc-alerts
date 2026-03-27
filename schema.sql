@@ -117,3 +117,21 @@ CREATE TABLE IF NOT EXISTS email_events (
 
 CREATE INDEX IF NOT EXISTS idx_email_events_email ON email_events(email, created_at);
 CREATE INDEX IF NOT EXISTS idx_email_events_run ON email_events(run_id, event_type);
+
+-- Tracks showtime status transitions: Sellable → AlmostFull → SoldOut
+-- One row per (showtime_id, from_status → to_status) transition event
+CREATE TABLE IF NOT EXISTS showtime_status_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  showtime_id TEXT NOT NULL,
+  movie_slug TEXT NOT NULL,
+  showtime_date TEXT NOT NULL,
+  theater_slug TEXT NOT NULL,
+  format_tag TEXT NOT NULL,
+  showtime_time TEXT NOT NULL,
+  from_status TEXT,
+  to_status TEXT NOT NULL,
+  observed_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_status_history_showtime ON showtime_status_history(showtime_id, observed_at);
+CREATE INDEX IF NOT EXISTS idx_status_history_movie ON showtime_status_history(movie_slug, showtime_date);
