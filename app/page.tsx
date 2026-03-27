@@ -53,6 +53,14 @@ interface MovieInfo {
   description?: string;
 }
 
+interface DiscussionMessage {
+  id: number;
+  showtime_id: string;
+  anonymous_id: string;
+  body: string;
+  created_at: string;
+}
+
 const FORMAT_LIST = [
   { tag: "imax70mm", label: "IMAX 70mm", priority: 1 },
   { tag: "dolbycinema", label: "Dolby Cinema", priority: 2 },
@@ -462,6 +470,215 @@ function RsvpButton({ showtimeId }: { showtimeId: string }) {
 }
 
 /* =========================================================================
+   Discussion Thread — collapsible chat per showtime
+   ========================================================================= */
+function DiscussionThread({ showtimeId }: { showtimeId: string }) {
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState<DiscussionMessage[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+  const [input, setInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const myAid = typeof window !== "undefined" ? getAnonymousId() : "";
+
+  function loadMessages() {
+    fetch(`/api/discussions?showtime_id=${encodeURIComponent(showtimeId)}&limit=50`)
+      .then((r) => r.json())
+      .then((d: { messages?: DiscussionMessage[]; total?: number }) => {
+        setMessages(d.messages ?? []);
+        setTotal(d.total ?? 0);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }
+
+  const handleToggle = () => {
+    const next = !open;
+    setOpen(next);
+    if (next && !loaded) loadMessages();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = input.trim();
+    if (!trimmed || submitting) return;
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      const res = await fetch("/api/discussions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ showtime_id: showtimeId, anonymous_id: myAid, body: trimmed }),
+      });
+      if (res.ok) {
+        setInput("");
+        loadMessages();
+      } else {
+        const d = (await res.json()) as { error?: string };
+        setSubmitError(d.error ?? "Failed to post.");
+      }
+    } catch {
+      setSubmitError("Network error. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  function formatRelativeTime(ts: string): string {
+    const diff = Date.now() - new Date(ts).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  }
+
+  return (
+    <div style={{ width: "100%", marginTop: "var(--space-sm)" }}>
+      {/* Toggle button */}
+      <button
+        onClick={handleToggle}
+        data-testid={`discussion-toggle-${showtimeId}`}
+        aria-expanded={open}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          background: "none",
+          border: "1px solid var(--border-subtle)",
+          borderRadius: 6,
+          cursor: "pointer",
+          padding: "3px 8px",
+          color: "var(--text-tertiary)",
+          fontSize: "var(--text-xs)",
+          fontWeight: 600,
+        }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+        </svg>
+        {total > 0 ? `${total} comment${total !== 1 ? "s" : ""}` : "Chat"}
+        <span style={{ fontSize: 10 }}>{open ? "▲" : "▼"}</span>
+      </button>
+
+      {/* Thread panel */}
+      {open && (
+        <div
+          style={{
+            marginTop: "var(--space-sm)",
+            background: "var(--bg-base)",
+            border: "1px solid var(--border-subtle)",
+            borderRadius: 8,
+            padding: "var(--space-md)",
+          }}
+        >
+          {!loaded ? (
+            <div style={{ color: "var(--text-tertiary)", fontSize: "var(--text-xs)", padding: "var(--space-sm) 0" }}>
+              Loading…
+            </div>
+          ) : (
+            <>
+              {/* Messages */}
+              {messages.length === 0 ? (
+                <div style={{ color: "var(--text-tertiary)", fontSize: "var(--text-xs)", marginBottom: "var(--space-md)" }}>
+                  No comments yet. Start the conversation!
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginBottom: "var(--space-md)" }}>
+                  {messages.map((m) => {
+                    const isMe = m.anonymous_id === myAid;
+                    return (
+                      <div
+                        key={m.id}
+                        data-testid={`discussion-message-${m.id}`}
+                        style={{
+                          background: isMe ? "rgba(99, 102, 241, 0.07)" : "var(--bg-elevated)",
+                          border: isMe ? "1px solid rgba(99, 102, 241, 0.3)" : "1px solid var(--border-subtle)",
+                          borderRadius: 6,
+                          padding: "6px 10px",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginBottom: 2 }}>
+                          <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: isMe ? "rgb(99,102,241)" : "var(--text-secondary)" }}>
+                            {isMe ? "You" : "Anonymous"}
+                          </span>
+                          <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
+                            {formatRelativeTime(m.created_at)}
+                          </span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-primary)", lineHeight: "var(--leading-normal)" }}>
+                          {m.body}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Post form */}
+              <form onSubmit={handleSubmit} style={{ display: "flex", gap: "var(--space-sm)", alignItems: "flex-end" }}>
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  maxLength={280}
+                  placeholder="Add a comment…"
+                  data-testid={`discussion-input-${showtimeId}`}
+                  rows={2}
+                  style={{
+                    flex: 1,
+                    background: "var(--bg-elevated)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: 6,
+                    padding: "6px 10px",
+                    color: "var(--text-primary)",
+                    fontSize: "var(--text-sm)",
+                    resize: "none",
+                    fontFamily: "inherit",
+                    outline: "none",
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={submitting || !input.trim()}
+                  data-testid={`discussion-submit-${showtimeId}`}
+                  style={{
+                    background: "var(--accent)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 6,
+                    padding: "6px 14px",
+                    fontSize: "var(--text-sm)",
+                    fontWeight: 600,
+                    cursor: submitting || !input.trim() ? "default" : "pointer",
+                    opacity: submitting || !input.trim() ? 0.5 : 1,
+                    flexShrink: 0,
+                  }}
+                >
+                  {submitting ? "…" : "Post"}
+                </button>
+              </form>
+              {submitError && (
+                <p style={{ margin: "var(--space-xs) 0 0", fontSize: "var(--text-xs)", color: "var(--accent)" }}>
+                  {submitError}
+                </p>
+              )}
+              <div style={{ textAlign: "right", marginTop: 4 }}>
+                <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
+                  {input.length}/280
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =========================================================================
    Skeleton Components
    ========================================================================= */
 function ShowtimeSkeleton() {
@@ -649,7 +866,7 @@ function DateCard({
               className="showtime-row"
               style={{
                 display: "flex",
-                alignItems: "center",
+                alignItems: "flex-start",
                 justifyContent: "space-between",
                 background: "var(--bg-elevated)",
                 borderRadius: 6,
@@ -714,6 +931,7 @@ function DateCard({
                   Buy tickets
                 </a>
               </div>
+              <DiscussionThread showtimeId={st.id} />
             </div>
           ))}
         </div>
