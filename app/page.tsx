@@ -1522,6 +1522,122 @@ function DateSetup({
 }
 
 /* =========================================================================
+   News Section
+   ========================================================================= */
+interface NewsArticle {
+  title: string;
+  link: string;
+  pubDate: string;
+  source: string;
+}
+
+function NewsSection({ articles }: { articles: NewsArticle[] }) {
+  if (articles.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: "var(--space-2xl)" }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-sm)", marginBottom: "var(--space-lg)" }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>
+          Latest News
+        </h2>
+        <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", fontWeight: 500 }}>
+          via Google News
+        </span>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+          gap: "var(--space-base)",
+        }}
+      >
+        {articles.map((article, i) => (
+          <a
+            key={i}
+            href={article.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: "none" }}
+          >
+            <div
+              className="card"
+              style={{
+                padding: "var(--space-lg)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--space-sm)",
+                height: "100%",
+                cursor: "pointer",
+                transition: "border-color 0.15s",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.8px",
+                    color: "var(--accent)",
+                    background: "rgba(99,102,241,0.12)",
+                    padding: "2px 7px",
+                    borderRadius: 4,
+                    maxWidth: "60%",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {article.source}
+                </span>
+                {article.pubDate && (
+                  <span style={{ fontSize: 10, color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
+                    {formatNewsDate(article.pubDate)}
+                  </span>
+                )}
+              </div>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "var(--text-sm)",
+                  fontWeight: 500,
+                  color: "var(--text-primary)",
+                  lineHeight: "var(--leading-normal)",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}
+              >
+                {article.title}
+              </p>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function formatNewsDate(pubDate: string): string {
+  try {
+    const d = new Date(pubDate);
+    if (isNaN(d.getTime())) return "";
+    const now = Date.now();
+    const diffMs = now - d.getTime();
+    const diffH = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffH < 1) return "just now";
+    if (diffH < 24) return `${diffH}h ago`;
+    const diffD = Math.floor(diffH / 24);
+    if (diffD < 7) return `${diffD}d ago`;
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  } catch {
+    return "";
+  }
+}
+
+/* =========================================================================
    Main Page
    ========================================================================= */
 export default function Home() {
@@ -1551,11 +1667,23 @@ export default function Home() {
   const [turnstileToken, setTurnstileToken] = useState("");
   const turnstileRef = useRef<HTMLDivElement>(null);
 
+  const [newsArticles, setNewsArticles] = useState<NewsArticle[]>([]);
+
   // Fetch subscriber count for social proof
   useEffect(() => {
     fetch("/api/stats")
       .then((r) => r.json())
       .then((data: { subscribers: number }) => setSubscriberCount(data.subscribers))
+      .catch(() => {});
+  }, []);
+
+  // Fetch news feed
+  useEffect(() => {
+    fetch("/api/news")
+      .then((r) => r.json())
+      .then((data: { articles?: NewsArticle[] }) => {
+        if (data.articles && data.articles.length > 0) setNewsArticles(data.articles);
+      })
       .catch(() => {});
   }, []);
 
@@ -2256,6 +2384,9 @@ export default function Home() {
               </div>
 
             </div>
+
+            {/* ===== NEWS FEED ===== */}
+            <NewsSection articles={newsArticles} />
 
           </section>
         )}
