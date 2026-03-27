@@ -11,6 +11,7 @@ interface Showtime {
   amPm: string;
   status: string;
   url: string;
+  promo?: string;
 }
 
 interface DateResult {
@@ -398,7 +399,7 @@ function DateCard({
                 flexWrap: "wrap",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-md)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-md)", flexWrap: "wrap" }}>
                 <span
                   style={{
                     fontSize: "var(--text-base)",
@@ -420,6 +421,23 @@ function DateCard({
                   </span>
                 </span>
                 <StatusBadge status={st.status} />
+                {st.promo && (
+                  <span
+                    style={{
+                      fontSize: "var(--text-xs)",
+                      fontWeight: 700,
+                      color: "#22C55E",
+                      background: "rgba(34, 197, 94, 0.12)",
+                      border: "1px solid rgba(34, 197, 94, 0.3)",
+                      borderRadius: 4,
+                      padding: "2px 6px",
+                      whiteSpace: "nowrap",
+                      letterSpacing: "0.02em",
+                    }}
+                  >
+                    {st.promo}
+                  </span>
+                )}
               </div>
               <a
                 href={st.url}
@@ -642,6 +660,7 @@ function ComparisonGrid({
                                 rel="noopener noreferrer"
                                 data-testid={`buy-tickets-${st.id}`}
                                 data-showtime-id={st.id}
+                                title={st.promo || undefined}
                                 style={{
                                   display: "inline-block",
                                   padding: "4px 8px",
