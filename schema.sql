@@ -60,3 +60,13 @@ CREATE TABLE IF NOT EXISTS scraper_runs (
   error_message TEXT DEFAULT NULL,
   ran_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS reviews (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  movie_slug TEXT NOT NULL,
+  anonymous_id TEXT NOT NULL,
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  body TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE (movie_slug, anonymous_id)
+);
