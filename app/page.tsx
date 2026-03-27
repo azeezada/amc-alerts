@@ -2188,6 +2188,250 @@ function SelloutSpeedBadge({ movieSlug }: { movieSlug: string }) {
   );
 }
 
+interface HeatmapCell {
+  date: string;
+  time_slot: string;
+  sellout_speed_hours: number | null;
+  current_status: "Sellable" | "AlmostFull" | "SoldOut" | null;
+  showtime_count: number;
+}
+
+interface HeatmapData {
+  movie_slug: string;
+  dates: string[];
+  time_slots: string[];
+  cells: HeatmapCell[];
+  dev_mode?: boolean;
+}
+
+function heatmapCellColor(cell: HeatmapCell): { bg: string; border: string; text: string } {
+  if (cell.showtime_count === 0) {
+    return { bg: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.06)", text: "var(--text-quaternary, #555)" };
+  }
+  if (cell.sellout_speed_hours !== null) {
+    // Has sold out — color by speed
+    const h = cell.sellout_speed_hours;
+    if (h <= 2) return { bg: "rgba(239,68,68,0.25)", border: "rgba(239,68,68,0.5)", text: "#ef4444" };
+    if (h <= 6) return { bg: "rgba(251,146,60,0.2)", border: "rgba(251,146,60,0.45)", text: "#fb923c" };
+    return { bg: "rgba(250,204,21,0.15)", border: "rgba(250,204,21,0.35)", text: "#facc15" };
+  }
+  if (cell.current_status === "SoldOut") {
+    return { bg: "rgba(239,68,68,0.15)", border: "rgba(239,68,68,0.35)", text: "#ef4444" };
+  }
+  if (cell.current_status === "AlmostFull") {
+    return { bg: "rgba(251,146,60,0.12)", border: "rgba(251,146,60,0.3)", text: "#fb923c" };
+  }
+  // Sellable or unknown
+  return { bg: "rgba(34,197,94,0.08)", border: "rgba(34,197,94,0.2)", text: "#22c55e" };
+}
+
+function formatDateShort(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const d = new Date(year, month - 1, day);
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+function WeekendHeatmap({ movieSlug }: { movieSlug: string }) {
+  const [data, setData] = useState<HeatmapData | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/heatmap?movie=${encodeURIComponent(movieSlug)}`)
+      .then((r) => r.json())
+      .then((d: HeatmapData) => {
+        if (d.dates && d.dates.length > 0) setData(d);
+      })
+      .catch(() => {});
+  }, [movieSlug]);
+
+  if (!data) return null;
+
+  const cellByKey: Record<string, HeatmapCell> = {};
+  for (const cell of data.cells) {
+    cellByKey[`${cell.date}|${cell.time_slot}`] = cell;
+  }
+
+  return (
+    <div style={{ marginTop: "var(--space-2xl)" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "var(--space-base)",
+          cursor: "pointer",
+        }}
+        onClick={() => setCollapsed((c) => !c)}
+      >
+        <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-sm)" }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>
+            Opening Weekend Heatmap
+          </h2>
+          <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", fontWeight: 500 }}>
+            sellout speed by date &amp; time
+          </span>
+        </div>
+        <span style={{ fontSize: 12, color: "var(--text-tertiary)", userSelect: "none" }}>
+          {collapsed ? "▼ show" : "▲ hide"}
+        </span>
+      </div>
+
+      {!collapsed && (
+        <>
+          {/* Legend */}
+          <div style={{ display: "flex", gap: 12, marginBottom: "var(--space-base)", flexWrap: "wrap" }}>
+            {[
+              { bg: "rgba(239,68,68,0.25)", border: "rgba(239,68,68,0.5)", label: "Sold out ≤2h" },
+              { bg: "rgba(251,146,60,0.2)", border: "rgba(251,146,60,0.45)", label: "Sold out 2–6h" },
+              { bg: "rgba(250,204,21,0.15)", border: "rgba(250,204,21,0.35)", label: "Sold out >6h" },
+              { bg: "rgba(251,146,60,0.12)", border: "rgba(251,146,60,0.3)", label: "Almost full" },
+              { bg: "rgba(34,197,94,0.08)", border: "rgba(34,197,94,0.2)", label: "Available" },
+              { bg: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.06)", label: "No data" },
+            ].map((item) => (
+              <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: 3,
+                    background: item.bg,
+                    border: `1px solid ${item.border}`,
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{item.label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Grid */}
+          <div style={{ overflowX: "auto" }}>
+            <table
+              style={{
+                borderCollapse: "separate",
+                borderSpacing: 3,
+                fontSize: "var(--text-sm)",
+                minWidth: "100%",
+              }}
+            >
+              <thead>
+                <tr>
+                  <th
+                    style={{
+                      textAlign: "left",
+                      padding: "4px 8px",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "var(--text-tertiary)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Date
+                  </th>
+                  {data.time_slots.map((slot) => (
+                    <th
+                      key={slot}
+                      style={{
+                        padding: "4px 8px",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: "var(--text-tertiary)",
+                        whiteSpace: "nowrap",
+                        textAlign: "center",
+                      }}
+                    >
+                      {slot}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.dates.map((date) => (
+                  <tr key={date}>
+                    <td
+                      style={{
+                        padding: "4px 8px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "var(--text-secondary)",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {formatDateShort(date)}
+                    </td>
+                    {data.time_slots.map((slot) => {
+                      const cell = cellByKey[`${date}|${slot}`];
+                      if (!cell) {
+                        return (
+                          <td key={slot} style={{ padding: 3 }}>
+                            <div
+                              style={{
+                                width: 80,
+                                height: 44,
+                                borderRadius: 6,
+                                background: "rgba(255,255,255,0.03)",
+                                border: "1px solid rgba(255,255,255,0.06)",
+                              }}
+                            />
+                          </td>
+                        );
+                      }
+                      const { bg, border, text } = heatmapCellColor(cell);
+                      const label =
+                        cell.sellout_speed_hours !== null
+                          ? `${cell.sellout_speed_hours}h`
+                          : cell.current_status === "SoldOut"
+                          ? "Sold Out"
+                          : cell.current_status === "AlmostFull"
+                          ? "Almost Full"
+                          : cell.current_status === "Sellable"
+                          ? "Available"
+                          : "—";
+                      return (
+                        <td key={slot} style={{ padding: 3 }}>
+                          <div
+                            title={`${formatDateShort(date)} ${slot} — ${label}${cell.sellout_speed_hours !== null ? " to sell out" : ""}${cell.showtime_count > 0 ? ` (${cell.showtime_count} showtime${cell.showtime_count !== 1 ? "s" : ""})` : ""}`}
+                            style={{
+                              width: 80,
+                              height: 44,
+                              borderRadius: 6,
+                              background: bg,
+                              border: `1px solid ${border}`,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexDirection: "column",
+                              gap: 2,
+                            }}
+                          >
+                            <span style={{ fontSize: 12, fontWeight: 700, color: text }}>
+                              {label}
+                            </span>
+                            {cell.showtime_count > 0 && (
+                              <span style={{ fontSize: 9, color: "var(--text-quaternary, #555)" }}>
+                                {cell.showtime_count} show{cell.showtime_count !== 1 ? "s" : ""}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {data.dev_mode && (
+            <p style={{ fontSize: 11, color: "var(--text-quaternary, #555)", marginTop: "var(--space-sm)" }}>
+              Preview with sample data — live heatmap populates as showtimes go on sale.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function NewsSection({ articles }: { articles: NewsArticle[] }) {
   if (articles.length === 0) return null;
 
@@ -3365,6 +3609,9 @@ export default function Home() {
                 <SelloutSpeedBadge movieSlug={selectedMovie} />
               </div>
             )}
+
+            {/* ===== OPENING WEEKEND HEATMAP ===== */}
+            {selectedMovie && <WeekendHeatmap movieSlug={selectedMovie} />}
 
             {/* ===== COMPETITOR COMPARISON ===== */}
             {movieTitle && (
