@@ -105,3 +105,15 @@ CREATE TABLE IF NOT EXISTS price_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_price_history_movie ON price_history(movie_slug, observed_at);
+
+CREATE TABLE IF NOT EXISTS email_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_type TEXT NOT NULL,
+  email TEXT NOT NULL,
+  run_id TEXT,
+  url TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_events_email ON email_events(email, created_at);
+CREATE INDEX IF NOT EXISTS idx_email_events_run ON email_events(run_id, event_type);
