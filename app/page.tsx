@@ -1784,6 +1784,9 @@ export default function Home() {
   const [turnstileToken, setTurnstileToken] = useState("");
   const turnstileRef = useRef<HTMLDivElement>(null);
   const [abVariant, setAbVariant] = useState<"A" | "B">("A");
+  const [inboundRefCode, setInboundRefCode] = useState<string>("");
+  const [myReferralCode, setMyReferralCode] = useState<string>("");
+  const [referralCopied, setReferralCopied] = useState(false);
 
   const [newsArticles, setNewsArticles] = useState<NewsArticle[]>([]);
 
@@ -1906,12 +1909,14 @@ export default function Home() {
           channel: subChannel,
           phone: subChannel !== "email" ? subPhone : undefined,
           abVariant,
+          refCode: inboundRefCode || undefined,
         }),
       });
       const data = await resp.json();
       if (resp.ok && data.success) {
         setSubStatus("success");
         setSubMsg(data.message);
+        if (data.referralCode) setMyReferralCode(data.referralCode);
       } else {
         setSubStatus("error");
         setSubMsg(data.error || "Something went wrong.");
@@ -1925,6 +1930,11 @@ export default function Home() {
   // Initialize from URL params or localStorage
   useEffect(() => {
     setMounted(true);
+    // Capture inbound referral code from ?ref=
+    const searchParams = new URLSearchParams(window.location.search);
+    const ref = searchParams.get("ref");
+    if (ref && /^[a-f0-9]{8}$/.test(ref)) setInboundRefCode(ref);
+
     const urlParams = readUrlParams();
     const lsParams = readLocalStorage();
 
@@ -2111,7 +2121,43 @@ export default function Home() {
       >
         <div style={{ maxWidth: 960, margin: "0 auto" }}>
           {subStatus === "success" ? (
-            <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", margin: 0 }}>{subMsg}</p>
+            <div>
+              <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", margin: "0 0 var(--space-sm)" }}>{subMsg}</p>
+              {myReferralCode && (
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "var(--space-sm)",
+                    background: "var(--surface-2)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 6,
+                    padding: "6px 12px",
+                    flexWrap: "wrap",
+                    justifyContent: "center",
+                  }}
+                >
+                  <span style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)" }}>
+                    Invite friends for priority alerts:
+                  </span>
+                  <code style={{ fontSize: "var(--text-xs)", color: "var(--text-primary)", fontFamily: "monospace" }}>
+                    {typeof window !== "undefined" ? `${window.location.origin}/invite/${myReferralCode}` : `/invite/${myReferralCode}`}
+                  </code>
+                  <button
+                    className="btn-ghost"
+                    style={{ fontSize: "var(--text-xs)", padding: "2px 10px" }}
+                    onClick={async () => {
+                      const url = `${window.location.origin}/invite/${myReferralCode}`;
+                      await navigator.clipboard.writeText(url);
+                      setReferralCopied(true);
+                      setTimeout(() => setReferralCopied(false), 2000);
+                    }}
+                  >
+                    {referralCopied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             <>
               <p style={{ margin: "0 0 var(--space-sm)", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-primary)" }} data-ab-variant={abVariant}>

@@ -24,8 +24,9 @@ export async function POST(request: NextRequest) {
       phone?: string;
       channel?: string;
       abVariant?: string;
+      refCode?: string;
     };
-    const { email, dates, turnstileToken, movieSlug, movieTitle, theaterSlugs, phone, channel, abVariant } = body;
+    const { email, dates, turnstileToken, movieSlug, movieTitle, theaterSlugs, phone, channel, abVariant, refCode } = body;
 
     // Verify Turnstile token if provided (skip in dev)
     if (turnstileToken) {
@@ -82,10 +83,17 @@ export async function POST(request: NextRequest) {
     const validVariants = ["A", "B"];
     const subAbVariant = abVariant && validVariants.includes(abVariant) ? abVariant : null;
 
+    // Referral: validate incoming refCode (8 alphanumeric chars) and generate one for the new subscriber
+    const subReferredBy = refCode && /^[a-z0-9]{8}$/.test(refCode) ? refCode : null;
+    const newReferralCode = Array.from(crypto.getRandomValues(new Uint8Array(4)))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
     if (!db) {
-      console.log(`[DEV] Would subscribe: ${email} for dates: ${selectedDates.join(", ")}, movie: ${subMovieSlug}, theaters: ${subTheaterSlugs?.join(", ") ?? "all"}, channel: ${subChannel}, variant: ${subAbVariant}`);
+      console.log(`[DEV] Would subscribe: ${email} for dates: ${selectedDates.join(", ")}, movie: ${subMovieSlug}, theaters: ${subTheaterSlugs?.join(", ") ?? "all"}, channel: ${subChannel}, variant: ${subAbVariant}, referredBy: ${subReferredBy}`);
       return NextResponse.json({
         success: true,
+        referralCode: newReferralCode,
         message: subChannel === "email"
           ? "You're on the list! We'll email you the moment tickets drop."
           : subChannel === "sms"
@@ -96,36 +104,41 @@ export async function POST(request: NextRequest) {
 
     // Check if already subscribed
     const existing = await db
-      .prepare("SELECT email, active FROM subscribers WHERE email = ?")
+      .prepare("SELECT email, active, referral_code FROM subscribers WHERE email = ?")
       .bind(email)
-      .first<{ email: string; active: number }>();
+      .first<{ email: string; active: number; referral_code: string | null }>();
 
     if (existing) {
       if (existing.active) {
         return NextResponse.json({
           success: true,
           alreadySubscribed: true,
+          referralCode: existing.referral_code || null,
           message: "You're already on the list!",
         });
       } else {
+        // On re-subscribe, keep existing referral_code if set
+        const keepCode = existing.referral_code || newReferralCode;
         await db
-          .prepare("UPDATE subscribers SET active = 1, dates = ?, movie_slug = ?, movie_title = ?, theater_slugs = ?, phone_number = ?, notification_channel = ?, ab_variant = ?, subscribed_at = datetime('now') WHERE email = ?")
-          .bind(JSON.stringify(selectedDates), subMovieSlug, subMovieTitle, subTheaterSlugs ? JSON.stringify(subTheaterSlugs) : null, subPhone, subChannel, subAbVariant, email)
+          .prepare("UPDATE subscribers SET active = 1, dates = ?, movie_slug = ?, movie_title = ?, theater_slugs = ?, phone_number = ?, notification_channel = ?, ab_variant = ?, subscribed_at = datetime('now'), referral_code = COALESCE(referral_code, ?) WHERE email = ?")
+          .bind(JSON.stringify(selectedDates), subMovieSlug, subMovieTitle, subTheaterSlugs ? JSON.stringify(subTheaterSlugs) : null, subPhone, subChannel, subAbVariant, newReferralCode, email)
           .run();
         return NextResponse.json({
           success: true,
+          referralCode: keepCode,
           message: "Welcome back! You've been re-subscribed.",
         });
       }
     }
 
     await db
-      .prepare("INSERT INTO subscribers (email, dates, movie_slug, movie_title, theater_slugs, phone_number, notification_channel, ab_variant) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-      .bind(email, JSON.stringify(selectedDates), subMovieSlug, subMovieTitle, subTheaterSlugs ? JSON.stringify(subTheaterSlugs) : null, subPhone, subChannel, subAbVariant)
+      .prepare("INSERT INTO subscribers (email, dates, movie_slug, movie_title, theater_slugs, phone_number, notification_channel, ab_variant, referral_code, referred_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(email, JSON.stringify(selectedDates), subMovieSlug, subMovieTitle, subTheaterSlugs ? JSON.stringify(subTheaterSlugs) : null, subPhone, subChannel, subAbVariant, newReferralCode, subReferredBy)
       .run();
 
     return NextResponse.json({
       success: true,
+      referralCode: newReferralCode,
       message: subChannel === "email"
         ? "You're on the list! We'll email you the moment tickets drop."
         : subChannel === "sms"

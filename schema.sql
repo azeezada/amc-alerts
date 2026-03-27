@@ -10,7 +10,9 @@ CREATE TABLE IF NOT EXISTS subscribers (
   subscribed_at TEXT DEFAULT (datetime('now')),
   notified_at TEXT,
   active INTEGER DEFAULT 1,
-  ab_variant TEXT DEFAULT NULL
+  ab_variant TEXT DEFAULT NULL,
+  referral_code TEXT UNIQUE DEFAULT NULL,
+  referred_by TEXT DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS showtime_cache (
