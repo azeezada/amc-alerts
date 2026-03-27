@@ -51,6 +51,36 @@ interface ScraperRun {
   ran_at: string | null;
 }
 
+interface PriceChartPoint {
+  observed_at: string;
+  showtime_count: number;
+  promo: string | null;
+}
+
+interface PriceFormatSeries {
+  format_tag: string;
+  points: PriceChartPoint[];
+}
+
+interface PriceTheaterSeries {
+  theater_slug: string;
+  formats: PriceFormatSeries[];
+}
+
+interface PriceMovieChart {
+  movie_slug: string;
+  theaters: PriceTheaterSeries[];
+  current_promos: string[];
+  first_observed: string | null;
+  last_observed: string | null;
+  total_observations: number;
+}
+
+interface PriceHistoryData {
+  charts: PriceMovieChart[];
+  devMode?: boolean;
+}
+
 interface AdminData {
   devMode?: boolean;
   subscribers: {
@@ -126,6 +156,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<AdminData | null>(null);
   const [error, setError] = useState("");
+  const [priceHistory, setPriceHistory] = useState<PriceHistoryData | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -151,6 +182,16 @@ export default function AdminPage() {
       }
       setData(json);
       setAuthed(true);
+      // Fetch price history (public endpoint, no secret needed)
+      try {
+        const priceResp = await fetch("/api/price-history");
+        if (priceResp.ok) {
+          const priceJson = await priceResp.json() as PriceHistoryData;
+          setPriceHistory(priceJson);
+        }
+      } catch {
+        // Non-fatal — price history may not be available yet
+      }
     } catch {
       setError("Network error");
     }
@@ -674,6 +715,119 @@ export default function AdminPage() {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Price History Charts */}
+            {priceHistory && priceHistory.charts.length > 0 && (
+              <div style={{ marginBottom: "var(--space-xl)" }}>
+                <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 var(--space-md)" }}>
+                  Price &amp; Availability History
+                  {priceHistory.devMode && (
+                    <span style={{ fontSize: 11, fontWeight: 400, color: "var(--text-tertiary)", marginLeft: 8 }}>
+                      (dev mock data)
+                    </span>
+                  )}
+                </h2>
+                {priceHistory.charts.map((chart) => (
+                  <div key={chart.movie_slug} style={{ marginBottom: "var(--space-lg)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginBottom: "var(--space-sm)" }}>
+                      <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-secondary)" }}>
+                        {chart.movie_slug}
+                      </span>
+                      {chart.current_promos.length > 0 && (
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {chart.current_promos.map((p) => (
+                            <span
+                              key={p}
+                              style={{
+                                display: "inline-block",
+                                padding: "2px 6px",
+                                borderRadius: 3,
+                                fontSize: "var(--text-xs)",
+                                fontWeight: 700,
+                                background: "rgba(34,197,94,0.15)",
+                                color: "#22c55e",
+                              }}
+                            >
+                              {p}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginLeft: "auto" }}>
+                        {chart.total_observations} observation{chart.total_observations !== 1 ? "s" : ""}
+                        {chart.first_observed && ` · since ${formatRelativeTime(chart.first_observed)}`}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+                        gap: "var(--space-sm)",
+                      }}
+                    >
+                      {chart.theaters.flatMap((theater) =>
+                        theater.formats.map((fmt) => {
+                          const pts = fmt.points.slice(-20);
+                          const maxCount = Math.max(...pts.map((p) => p.showtime_count), 1);
+                          return (
+                            <div key={`${theater.theater_slug}-${fmt.format_tag}`} style={cardStyle}>
+                              <span style={{ ...labelStyle, marginBottom: "var(--space-xs)" }}>
+                                {theater.theater_slug.split("-").slice(1, 3).join(" ")} · {fmt.format_tag}
+                              </span>
+                              {pts.length === 0 ? (
+                                <p style={{ color: "var(--text-tertiary)", fontSize: "var(--text-xs)", margin: 0 }}>
+                                  No data
+                                </p>
+                              ) : (
+                                <div>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "flex-end",
+                                      gap: 3,
+                                      height: 48,
+                                      marginBottom: 6,
+                                    }}
+                                  >
+                                    {pts.map((pt, i) => (
+                                      <div
+                                        key={i}
+                                        title={`${pt.observed_at.slice(0, 16)} · ${pt.showtime_count} showtimes${pt.promo ? ` · ${pt.promo}` : ""}`}
+                                        style={{
+                                          flex: 1,
+                                          height: `${Math.max(4, Math.round((pt.showtime_count / maxCount) * 48))}px`,
+                                          borderRadius: "2px 2px 0 0",
+                                          background: pt.promo ? "#22c55e" : "var(--accent)",
+                                          opacity: 0.85,
+                                          transition: "height 0.2s",
+                                        }}
+                                      />
+                                    ))}
+                                  </div>
+                                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                    <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
+                                      {pts[0]?.observed_at.slice(5, 16)}
+                                    </span>
+                                    <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
+                                      {pts[pts.length - 1]?.observed_at.slice(5, 16)}
+                                    </span>
+                                  </div>
+                                  {pts.some((p) => p.promo) && (
+                                    <div style={{ fontSize: 10, color: "#22c55e", marginTop: 4 }}>
+                                      Green bars = promo active
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 

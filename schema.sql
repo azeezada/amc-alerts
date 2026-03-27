@@ -92,3 +92,16 @@ CREATE TABLE IF NOT EXISTS ticket_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ticket_history_movie ON ticket_history(movie_slug, first_seen_at);
+
+CREATE TABLE IF NOT EXISTS price_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  movie_slug TEXT NOT NULL,
+  showtime_date TEXT NOT NULL,
+  theater_slug TEXT NOT NULL,
+  format_tag TEXT NOT NULL,
+  promo TEXT,
+  showtime_count INTEGER NOT NULL DEFAULT 0,
+  observed_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_price_history_movie ON price_history(movie_slug, observed_at);

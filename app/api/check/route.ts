@@ -190,6 +190,19 @@ async function runCheck(_request: NextRequest) {
                 }
               }
 
+              // Record price/promo observation in price_history on every check
+              try {
+                const promo = dateResult.showtimes.find((s) => s.promo)?.promo ?? null;
+                await db
+                  .prepare(
+                    "INSERT INTO price_history (movie_slug, showtime_date, theater_slug, format_tag, promo, showtime_count) VALUES (?, ?, ?, ?, ?, ?)"
+                  )
+                  .bind(movieSlug, date, theaterSlug, formatTag, promo, dateResult.showtimes.length)
+                  .run();
+              } catch (_) {
+                // Table may not exist yet on old deployments
+              }
+
               // Update cache
               try {
                 await db
