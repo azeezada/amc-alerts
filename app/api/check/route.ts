@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAllTheatersAndFormats, DateResult, TARGET_DATES, THEATERS, FORMATS, DEFAULT_MOVIE_SLUG } from "@/lib/scraper";
-import { buildEmailHtml, buildEmailText } from "@/lib/email";
+import { buildEmailHtml, buildEmailText, sendAdminErrorAlert } from "@/lib/email";
 import { getCfEnv, type D1Database } from "@/lib/cf-env";
 import { generateUnsubscribeToken } from "@/lib/unsubscribe-token";
 import { sendSmsAlert } from "@/lib/sms";
@@ -311,6 +311,15 @@ async function runCheck(_request: NextRequest) {
     logLine(`ERROR: ${e}`);
     if (db) {
       await writeScraperRun(db, runId, "error", Date.now() - startMs, 0, 0, 0, String(e));
+    }
+    // Notify admin on scraper failure if ADMIN_ALERT_EMAIL and RESEND_API_KEY are set
+    const adminEmail: string | undefined = (env as any).ADMIN_ALERT_EMAIL;
+    if (adminEmail && resendApiKey) {
+      try {
+        await sendAdminErrorAlert(String(e), resendApiKey, adminEmail, { runId });
+      } catch (alertErr) {
+        logLine(`Admin alert failed: ${alertErr}`);
+      }
     }
     return NextResponse.json({ error: String(e), log }, { status: 500 });
   }

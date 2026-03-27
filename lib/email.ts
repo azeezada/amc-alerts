@@ -106,6 +106,70 @@ export function buildEmailHtml(
 </html>`;
 }
 
+export async function sendAdminErrorAlert(
+  errorMessage: string,
+  resendApiKey: string,
+  adminEmail: string,
+  context?: { runId?: string; moviesChecked?: number }
+): Promise<void> {
+  const runId = context?.runId ?? new Date().toISOString();
+  const moviesChecked = context?.moviesChecked ?? 0;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#0f0f1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <div style="max-width:600px;margin:0 auto;padding:24px 16px;">
+    <div style="background:#ef444422;border:2px solid #ef4444;border-radius:8px;padding:20px;margin-bottom:24px;">
+      <h2 style="color:#ef4444;margin:0 0 8px;font-size:20px;">🚨 AMC Scraper Error</h2>
+      <p style="color:#e5e7eb;margin:0;font-size:14px;">The AMC ticket scraper encountered an error and may need attention.</p>
+    </div>
+    <div style="background:#1e1e3a;border-radius:8px;padding:16px;margin-bottom:16px;">
+      <h3 style="color:#9ca3af;margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Error</h3>
+      <pre style="color:#f87171;font-size:13px;margin:0;white-space:pre-wrap;word-break:break-all;">${errorMessage}</pre>
+    </div>
+    <div style="background:#1e1e3a;border-radius:8px;padding:16px;">
+      <h3 style="color:#9ca3af;margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Run Details</h3>
+      <p style="color:#e5e7eb;font-size:13px;margin:4px 0;">Run ID: <code style="color:#a5b4fc;">${runId}</code></p>
+      <p style="color:#e5e7eb;font-size:13px;margin:4px 0;">Movies checked: ${moviesChecked}</p>
+    </div>
+    <p style="color:#6b7280;font-size:12px;margin-top:24px;text-align:center;">
+      AMC IMAX Alerts — Admin Notification
+    </p>
+  </div>
+</body>
+</html>`;
+
+  const text = [
+    "🚨 AMC Scraper Error",
+    "",
+    `Error: ${errorMessage}`,
+    `Run ID: ${runId}`,
+    `Movies checked: ${moviesChecked}`,
+  ].join("\n");
+
+  const resp = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "IMAX Alerts <alerts@churnrecovery.com>",
+      to: adminEmail,
+      subject: "🚨 AMC Scraper Error — Action Required",
+      html,
+      text,
+    }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    console.error(`Admin alert send failed ${resp.status}: ${err}`);
+  }
+}
+
 export function buildEmailText(
   newDates: DateResult[],
   movieTitle?: string,
