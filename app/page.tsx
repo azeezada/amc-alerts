@@ -684,41 +684,73 @@ function TheaterTabs({
         const isSelected = selected === theater.slug;
 
         return (
-          <button
-            key={theater.slug}
-            role="tab"
-            aria-selected={isSelected}
-            onClick={() => onChange(theater.slug)}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "var(--space-sm)",
-              padding: "8px 16px",
-              borderRadius: 20,
-              border: `1px solid ${isSelected ? "#FFFFFF" : "#444444"}`,
-              background: isSelected ? "#FFFFFF" : "#2A2A2A",
-              color: isSelected ? "#000000" : "#FFFFFF",
-              fontFamily: "inherit",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "all var(--dur-fast) var(--ease-default)",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {theater.name}
-            {theater.neighborhood && (
-              <span
-                style={{
-                  fontSize: "var(--text-xs)",
-                  color: isSelected ? "#666666" : "var(--text-tertiary)",
-                  fontWeight: 400,
-                }}
-              >
-                {theater.neighborhood}
-              </span>
-            )}
-          </button>
+          <div key={theater.slug} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <button
+              role="tab"
+              aria-selected={isSelected}
+              onClick={() => onChange(theater.slug)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "var(--space-sm)",
+                padding: "8px 16px",
+                borderRadius: 20,
+                border: `1px solid ${isSelected ? "#FFFFFF" : "#444444"}`,
+                background: isSelected ? "#FFFFFF" : "#2A2A2A",
+                color: isSelected ? "#000000" : "#FFFFFF",
+                fontFamily: "inherit",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all var(--dur-fast) var(--ease-default)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {theater.name}
+              {theater.neighborhood && (
+                <span
+                  style={{
+                    fontSize: "var(--text-xs)",
+                    color: isSelected ? "#666666" : "var(--text-tertiary)",
+                    fontWeight: 400,
+                  }}
+                >
+                  {theater.neighborhood}
+                </span>
+              )}
+            </button>
+            <a
+              href={`/theater/${theater.slug}`}
+              title={`${theater.name} info, directions & parking`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 22,
+                height: 22,
+                borderRadius: "50%",
+                background: "transparent",
+                border: "1px solid #444444",
+                color: "var(--text-tertiary)",
+                fontSize: 12,
+                fontWeight: 700,
+                textDecoration: "none",
+                lineHeight: 1,
+                flexShrink: 0,
+                transition: "border-color var(--dur-fast), color var(--dur-fast)",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.borderColor = "#FFFFFF";
+                (e.currentTarget as HTMLAnchorElement).style.color = "#FFFFFF";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.borderColor = "#444444";
+                (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-tertiary)";
+              }}
+            >
+              i
+            </a>
+          </div>
         );
       })}
     </div>
