@@ -1,11 +1,14 @@
 import { DateResult, formatDateNice } from "./scraper";
 
+const BASE_URL = "https://amc-alerts.pages.dev";
+
 export function buildEmailHtml(
   newDates: DateResult[],
   unsubscribeToken?: string,
   email?: string,
   movieTitle?: string,
-  theaterName?: string
+  theaterName?: string,
+  runId?: string
 ): string {
   const displayMovie = movieTitle || "IMAX Showtime";
   const displayTheater = theaterName || "AMC Theatres";
@@ -19,6 +22,9 @@ export function buildEmailHtml(
               : st.status === "AlmostFull"
               ? "#f59e0b"
               : "#ef4444";
+          const ticketHref = (email && runId)
+            ? `${BASE_URL}/api/track?type=click&email=${encodeURIComponent(email)}&run_id=${encodeURIComponent(runId)}&url=${encodeURIComponent(st.url)}`
+            : st.url;
           return `
           <tr>
             <td style="padding:8px 12px;color:#e5e7eb;font-size:15px;">
@@ -30,7 +36,7 @@ export function buildEmailHtml(
               </span>
             </td>
             <td style="padding:8px 12px;">
-              <a href="${st.url}" style="background:#e50914;color:#fff;text-decoration:none;padding:6px 16px;border-radius:4px;font-size:13px;font-weight:600;display:inline-block;">
+              <a href="${ticketHref}" style="background:#e50914;color:#fff;text-decoration:none;padding:6px 16px;border-radius:4px;font-size:13px;font-weight:600;display:inline-block;">
                 Buy Tickets →
               </a>
             </td>
@@ -101,6 +107,7 @@ export function buildEmailHtml(
       </p>
       ${unsubLink}
     </div>
+    ${(email && runId) ? `<img src="${BASE_URL}/api/track?type=open&email=${encodeURIComponent(email)}&run_id=${encodeURIComponent(runId)}" width="1" height="1" alt="" style="display:block;border:0;width:1px;height:1px;" />` : ""}
   </div>
 </body>
 </html>`;

@@ -53,6 +53,11 @@ interface ReferralStatsRow {
   referral_count: number;
 }
 
+interface TopClickedRow {
+  url: string;
+  count: number;
+}
+
 interface ScraperRunRow {
   id: number;
   run_id: string;
@@ -107,7 +112,6 @@ export async function GET(request: NextRequest) {
           { pref_date: "2026-04-01", count: 14 },
           { pref_date: "2026-04-02", count: 11 },
         ],
-        openRateNote: "Email open tracking not yet implemented",
         abTest: {
           variantA: 19,
           variantB: 23,
@@ -124,6 +128,18 @@ export async function GET(request: NextRequest) {
             { referral_code: "c9d0e1f2", email: "m***@outlook.com", referral_count: 2 },
           ],
         },
+      },
+      emailTracking: {
+        totalOpens: 24,
+        uniqueOpeners: 18,
+        totalClicks: 11,
+        uniqueClickers: 9,
+        openRate: 47,
+        clickRate: 24,
+        topClickedUrls: [
+          { url: "https://www.amctheatres.com/movies/project-hail-mary-76779/showtimes", count: 7 },
+          { url: "https://www.amctheatres.com/movies/project-hail-mary-76779/showtimes?location=empire-25", count: 4 },
+        ],
       },
       scraper: {
         cacheEntries: 0,
@@ -322,6 +338,47 @@ export async function GET(request: NextRequest) {
     const referralConversionRate =
       totalWithCode > 0 ? Math.round((totalReferred / totalWithCode) * 100) : 0;
 
+    // Email open/click tracking stats
+    let totalOpens = 0;
+    let uniqueOpeners = 0;
+    let totalClicks = 0;
+    let uniqueClickers = 0;
+    let topClickedUrls: TopClickedRow[] = [];
+    try {
+      const opensRow = await db
+        .prepare("SELECT COUNT(*) as count FROM email_events WHERE event_type = 'open'")
+        .first<CountRow>();
+      totalOpens = opensRow?.count ?? 0;
+
+      const uniqueOpenersRow = await db
+        .prepare("SELECT COUNT(DISTINCT email) as count FROM email_events WHERE event_type = 'open'")
+        .first<CountRow>();
+      uniqueOpeners = uniqueOpenersRow?.count ?? 0;
+
+      const clicksRow = await db
+        .prepare("SELECT COUNT(*) as count FROM email_events WHERE event_type = 'click'")
+        .first<CountRow>();
+      totalClicks = clicksRow?.count ?? 0;
+
+      const uniqueClickersRow = await db
+        .prepare("SELECT COUNT(DISTINCT email) as count FROM email_events WHERE event_type = 'click'")
+        .first<CountRow>();
+      uniqueClickers = uniqueClickersRow?.count ?? 0;
+
+      const { results: topUrls } = await db
+        .prepare(
+          "SELECT url, COUNT(*) as count FROM email_events WHERE event_type = 'click' AND url IS NOT NULL GROUP BY url ORDER BY count DESC LIMIT 10"
+        )
+        .all<TopClickedRow>();
+      topClickedUrls = topUrls;
+    } catch {
+      // email_events table may not exist on older deployments — degrade gracefully
+    }
+
+    const notifiedCount = activeRow?.count ?? 0;
+    const openRate = notifiedCount > 0 ? Math.round((uniqueOpeners / notifiedCount) * 100) : 0;
+    const clickRate = notifiedCount > 0 ? Math.round((uniqueClickers / notifiedCount) * 100) : 0;
+
     return NextResponse.json({
       devMode: false,
       subscribers: {
@@ -336,7 +393,6 @@ export async function GET(request: NextRequest) {
       analytics: {
         signupsByDay: signupsByDayRows,
         datePreferences: datePrefsRows,
-        openRateNote: "Email open tracking not yet implemented",
         abTest: {
           variantA: abVariantRows.find((r) => r.ab_variant === "A")?.count ?? 0,
           variantB: abVariantRows.find((r) => r.ab_variant === "B")?.count ?? 0,
@@ -349,6 +405,15 @@ export async function GET(request: NextRequest) {
           conversionRate: referralConversionRate,
           topReferrers,
         },
+      },
+      emailTracking: {
+        totalOpens,
+        uniqueOpeners,
+        totalClicks,
+        uniqueClickers,
+        openRate,
+        clickRate,
+        topClickedUrls,
       },
       scraper: {
         cacheEntries,
