@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { MARKETS, POPULAR_THEATERS } from "@/lib/theaters";
 
 /* =========================================================================
    Types
@@ -1279,17 +1280,10 @@ function FormatPills({
 }
 
 /* =========================================================================
-   CURATED THEATER LIST — NYC
+   SETUP FLOW — Step 1: Theater Selection (with City Selector)
    ========================================================================= */
-const CURATED_THEATERS: TheaterInfo[] = [
-  { slug: "amc-lincoln-square-13", name: "AMC Lincoln Square 13", neighborhood: "Upper West Side", hasImax70mm: true },
-  { slug: "amc-empire-25", name: "AMC Empire 25", neighborhood: "Times Square", hasImax70mm: false },
-  { slug: "amc-kips-bay-15", name: "AMC Kips Bay 15", neighborhood: "Kips Bay", hasImax70mm: false },
-];
+const AVAILABLE_MARKETS = MARKETS.filter((m) => POPULAR_THEATERS[m.slug]?.length > 0);
 
-/* =========================================================================
-   SETUP FLOW — Step 1: Theater Selection
-   ========================================================================= */
 function TheaterSetup({
   selectedTheaters,
   onSelect,
@@ -1299,6 +1293,20 @@ function TheaterSetup({
   onSelect: (theaters: string[]) => void;
   onNext: () => void;
 }) {
+  const [selectedMarket, setSelectedMarket] = useState("new-york-city");
+
+  const handleMarketChange = (marketSlug: string) => {
+    setSelectedMarket(marketSlug);
+    onSelect([]); // clear theater selection when city changes
+  };
+
+  const cityTheaters: TheaterInfo[] = (POPULAR_THEATERS[selectedMarket] || []).map((t) => ({
+    slug: t.slug,
+    name: t.name,
+    neighborhood: t.neighborhood,
+    hasImax70mm: t.hasImax70mm,
+  }));
+
   const toggleTheater = (slug: string) => {
     if (selectedTheaters.includes(slug)) {
       onSelect(selectedTheaters.filter((s) => s !== slug));
@@ -1323,17 +1331,54 @@ function TheaterSetup({
         style={{
           color: "var(--text-secondary)",
           fontSize: "var(--text-sm)",
-          margin: "0 0 var(--space-lg)",
+          margin: "0 0 var(--space-base)",
         }}
       >
-        Choose the theaters you want to track.
+        Choose your city, then the theaters you want to track.
       </p>
+
+      {/* City selector */}
+      <div
+        data-testid="city-selector"
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "var(--space-xs)",
+          marginBottom: "var(--space-lg)",
+        }}
+      >
+        {AVAILABLE_MARKETS.map((market) => {
+          const isActive = selectedMarket === market.slug;
+          return (
+            <button
+              key={market.slug}
+              data-testid={`city-${market.slug}`}
+              onClick={() => handleMarketChange(market.slug)}
+              style={{
+                padding: "6px 14px",
+                borderRadius: 20,
+                border: `1.5px solid ${isActive ? "var(--accent)" : "var(--border-subtle)"}`,
+                background: isActive ? "var(--accent)" : "var(--bg-surface)",
+                color: isActive ? "white" : "var(--text-secondary)",
+                fontFamily: "inherit",
+                fontSize: "var(--text-xs)",
+                fontWeight: isActive ? 700 : 500,
+                cursor: "pointer",
+                transition: "all var(--dur-fast) var(--ease-default)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {market.name}
+            </button>
+          );
+        })}
+      </div>
 
       <div
         style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginBottom: "var(--space-lg)" }}
         data-testid="theater-options"
       >
-        {CURATED_THEATERS.map((t) => {
+        {cityTheaters.map((t) => {
           const isSelected = selectedTheaters.includes(t.slug);
           return (
             <button
