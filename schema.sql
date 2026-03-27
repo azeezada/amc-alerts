@@ -38,6 +38,13 @@ CREATE TABLE IF NOT EXISTS group_members (
   joined_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS rsvps (
+  showtime_id TEXT NOT NULL,
+  anonymous_id TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (showtime_id, anonymous_id)
+);
+
 CREATE TABLE IF NOT EXISTS scraper_runs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   run_id TEXT NOT NULL,
