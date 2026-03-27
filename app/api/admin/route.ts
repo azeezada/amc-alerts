@@ -47,6 +47,12 @@ interface AbVariantRow {
   count: number;
 }
 
+interface ReferralStatsRow {
+  referral_code: string;
+  email: string;
+  referral_count: number;
+}
+
 interface ScraperRunRow {
   id: number;
   run_id: string;
@@ -107,6 +113,16 @@ export async function GET(request: NextRequest) {
           variantB: 23,
           unassigned: 0,
           note: "Variant B: 'Be first in line — get instant IMAX alerts' + 'Get instant alerts' CTA",
+        },
+        referrals: {
+          totalWithCode: 38,
+          totalReferred: 7,
+          conversionRate: 18,
+          topReferrers: [
+            { referral_code: "a1b2c3d4", email: "t***@gmail.com", referral_count: 3 },
+            { referral_code: "e5f6a7b8", email: "s***@yahoo.com", referral_count: 2 },
+            { referral_code: "c9d0e1f2", email: "m***@outlook.com", referral_count: 2 },
+          ],
         },
       },
       scraper: {
@@ -274,6 +290,38 @@ export async function GET(request: NextRequest) {
 
     const successRate = totalRuns > 0 ? Math.round((successRuns / totalRuns) * 100) : null;
 
+    // Referral stats
+    let totalWithCode = 0;
+    let totalReferred = 0;
+    let topReferrers: ReferralStatsRow[] = [];
+    try {
+      const withCodeRow = await db
+        .prepare("SELECT COUNT(*) as count FROM subscribers WHERE referral_code IS NOT NULL AND active = 1")
+        .first<CountRow>();
+      totalWithCode = withCodeRow?.count ?? 0;
+
+      const referredRow = await db
+        .prepare("SELECT COUNT(*) as count FROM subscribers WHERE referred_by IS NOT NULL AND active = 1")
+        .first<CountRow>();
+      totalReferred = referredRow?.count ?? 0;
+
+      const { results } = await db
+        .prepare(
+          "SELECT s.referral_code, s.email, COUNT(r.id) as referral_count FROM subscribers s JOIN subscribers r ON r.referred_by = s.referral_code WHERE r.active = 1 GROUP BY s.referral_code ORDER BY referral_count DESC LIMIT 10"
+        )
+        .all<ReferralStatsRow>();
+      // Mask emails
+      topReferrers = results.map((row) => {
+        const [local, domain] = row.email.split("@");
+        return { ...row, email: local.slice(0, 1) + "***@" + domain };
+      });
+    } catch {
+      // referral columns may not exist on older deployments — degrade gracefully
+    }
+
+    const referralConversionRate =
+      totalWithCode > 0 ? Math.round((totalReferred / totalWithCode) * 100) : 0;
+
     return NextResponse.json({
       devMode: false,
       subscribers: {
@@ -294,6 +342,12 @@ export async function GET(request: NextRequest) {
           variantB: abVariantRows.find((r) => r.ab_variant === "B")?.count ?? 0,
           unassigned: abVariantRows.find((r) => r.ab_variant === null)?.count ?? 0,
           note: "Variant B: 'Be first in line — get instant IMAX alerts' + 'Get instant alerts' CTA",
+        },
+        referrals: {
+          totalWithCode,
+          totalReferred,
+          conversionRate: referralConversionRate,
+          topReferrers,
         },
       },
       scraper: {
