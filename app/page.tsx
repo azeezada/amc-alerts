@@ -1755,6 +1755,253 @@ function formatNewsDate(pubDate: string): string {
 }
 
 /* =========================================================================
+   Community Reviews
+   ========================================================================= */
+interface Review {
+  id: number;
+  movie_slug: string;
+  anonymous_id: string;
+  rating: number;
+  body: string;
+  created_at: string;
+}
+
+function StarRating({
+  value,
+  onChange,
+  readonly,
+}: {
+  value: number;
+  onChange?: (v: number) => void;
+  readonly?: boolean;
+}) {
+  const [hovered, setHovered] = useState(0);
+  return (
+    <span style={{ display: "inline-flex", gap: 2 }} aria-label={`${value} out of 5 stars`}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <span
+          key={star}
+          onClick={() => !readonly && onChange?.(star)}
+          onMouseEnter={() => !readonly && setHovered(star)}
+          onMouseLeave={() => !readonly && setHovered(0)}
+          style={{
+            fontSize: 20,
+            cursor: readonly ? "default" : "pointer",
+            color: star <= (hovered || value) ? "#f59e0b" : "var(--border-default)",
+            transition: "color 0.1s",
+            userSelect: "none",
+          }}
+        >
+          ★
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function ReviewsSection({ movieSlug }: { movieSlug: string }) {
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loadingList, setLoadingList] = useState(true);
+  const [rating, setRating] = useState(0);
+  const [body, setBody] = useState("");
+  const [submitStatus, setSubmitStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [submitMsg, setSubmitMsg] = useState("");
+  const [myReviewId, setMyReviewId] = useState<number | null>(null);
+
+  const aid = typeof window !== "undefined" ? getAnonymousId() : "";
+
+  useEffect(() => {
+    if (!movieSlug) return;
+    setLoadingList(true);
+    fetch(`/api/reviews?movie_slug=${encodeURIComponent(movieSlug)}&limit=20`)
+      .then((r) => r.json())
+      .then((data: { reviews?: Review[]; total?: number }) => {
+        const list = data.reviews ?? [];
+        setReviews(list);
+        setTotal(data.total ?? list.length);
+        const mine = list.find((r) => r.anonymous_id === aid);
+        if (mine) {
+          setMyReviewId(mine.id);
+          setRating(mine.rating);
+          setBody(mine.body);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingList(false));
+  }, [movieSlug, aid]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (rating === 0) {
+      setSubmitMsg("Please select a star rating.");
+      setSubmitStatus("error");
+      return;
+    }
+    if (body.trim().length < 10) {
+      setSubmitMsg("Review must be at least 10 characters.");
+      setSubmitStatus("error");
+      return;
+    }
+    setSubmitStatus("loading");
+    setSubmitMsg("");
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ movie_slug: movieSlug, anonymous_id: aid, rating, body: body.trim() }),
+      });
+      const data = (await res.json()) as { id?: number; created?: boolean; updated?: boolean; error?: string };
+      if (!res.ok) {
+        setSubmitStatus("error");
+        setSubmitMsg(data.error ?? "Failed to submit review.");
+        return;
+      }
+      setSubmitStatus("success");
+      setSubmitMsg(data.updated ? "Review updated!" : "Review submitted. Thanks!");
+      setMyReviewId(data.id ?? null);
+      // Re-fetch reviews
+      fetch(`/api/reviews?movie_slug=${encodeURIComponent(movieSlug)}&limit=20`)
+        .then((r) => r.json())
+        .then((d: { reviews?: Review[]; total?: number }) => {
+          setReviews(d.reviews ?? []);
+          setTotal(d.total ?? 0);
+        })
+        .catch(() => {});
+    } catch {
+      setSubmitStatus("error");
+      setSubmitMsg("Network error. Please try again.");
+    }
+  }
+
+  const avgRating =
+    reviews.length > 0
+      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+      : null;
+
+  return (
+    <div style={{ marginTop: "var(--space-2xl)" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-sm)", marginBottom: "var(--space-lg)" }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>
+          Community Reviews
+        </h2>
+        {avgRating !== null && (
+          <span style={{ fontSize: "var(--text-sm)", color: "var(--text-tertiary)", fontWeight: 500 }}>
+            {avgRating.toFixed(1)} ★ · {total} {total === 1 ? "review" : "reviews"}
+          </span>
+        )}
+      </div>
+
+      {/* Submit form */}
+      <div className="card" style={{ padding: "var(--space-lg)", marginBottom: "var(--space-lg)" }}>
+        <h3 style={{ margin: "0 0 var(--space-md)", fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-primary)" }}>
+          {myReviewId ? "Update your review" : "Write a review"}
+        </h3>
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--space-md)" }}>
+          <div>
+            <label style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px", display: "block", marginBottom: 6 }}>
+              Your rating
+            </label>
+            <StarRating value={rating} onChange={setRating} />
+          </div>
+          <div>
+            <label style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px", display: "block", marginBottom: 6 }}>
+              Your review
+            </label>
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Share your thoughts after seeing the film…"
+              maxLength={1000}
+              rows={4}
+              style={{
+                width: "100%",
+                background: "var(--bg-elevated)",
+                border: "1.5px solid var(--border-default)",
+                borderRadius: 8,
+                padding: "var(--space-md)",
+                color: "var(--text-primary)",
+                fontSize: "var(--text-sm)",
+                resize: "vertical",
+                fontFamily: "inherit",
+                boxSizing: "border-box",
+              }}
+            />
+            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4, textAlign: "right" }}>
+              {body.length}/1000
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-md)" }}>
+            <button
+              type="submit"
+              disabled={submitStatus === "loading"}
+              style={{
+                background: "var(--accent)",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                padding: "10px 24px",
+                fontWeight: 700,
+                fontSize: "var(--text-sm)",
+                cursor: submitStatus === "loading" ? "not-allowed" : "pointer",
+                opacity: submitStatus === "loading" ? 0.7 : 1,
+              }}
+            >
+              {submitStatus === "loading" ? "Submitting…" : myReviewId ? "Update review" : "Submit review"}
+            </button>
+            {submitMsg && (
+              <span style={{ fontSize: "var(--text-sm)", color: submitStatus === "error" ? "var(--error)" : "var(--success)" }}>
+                {submitMsg}
+              </span>
+            )}
+          </div>
+        </form>
+      </div>
+
+      {/* Review list */}
+      {loadingList ? (
+        <div style={{ color: "var(--text-tertiary)", fontSize: "var(--text-sm)" }}>Loading reviews…</div>
+      ) : reviews.length === 0 ? (
+        <div className="card" style={{ padding: "var(--space-lg)", color: "var(--text-tertiary)", fontSize: "var(--text-sm)", textAlign: "center" }}>
+          No reviews yet. Be the first to share your thoughts after the showing!
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-md)" }}>
+          {reviews.map((r) => (
+            <div
+              key={r.id}
+              className="card"
+              style={{
+                padding: "var(--space-lg)",
+                borderLeft: r.anonymous_id === aid ? "3px solid var(--accent)" : undefined,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-sm)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
+                  <StarRating value={r.rating} readonly />
+                  {r.anonymous_id === aid && (
+                    <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px", color: "var(--accent)", background: "rgba(99,102,241,0.12)", padding: "2px 7px", borderRadius: 4 }}>
+                      You
+                    </span>
+                  )}
+                </div>
+                <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                  {formatNewsDate(r.created_at)}
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: "var(--leading-normal)" }}>
+                {r.body}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =========================================================================
    Main Page
    ========================================================================= */
 export default function Home() {
@@ -2567,6 +2814,9 @@ export default function Home() {
 
             {/* ===== NEWS FEED ===== */}
             <NewsSection articles={newsArticles} />
+
+            {/* ===== COMMUNITY REVIEWS ===== */}
+            {selectedMovie && <ReviewsSection movieSlug={selectedMovie} />}
 
           </section>
         )}
