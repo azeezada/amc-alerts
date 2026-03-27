@@ -203,6 +203,181 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 /* =========================================================================
+   Showtime Countdown + Reminder Toggle
+   ========================================================================= */
+function parseShowtimeDate(date: string, time: string, amPm: string): Date {
+  const [year, month, day] = date.split("-").map(Number);
+  const parts = time.split(":").map(Number);
+  const rawH = parts[0];
+  const rawM = parts[1] ?? 0;
+  const isPM = amPm.toLowerCase() === "pm";
+  let hours = rawH;
+  if (isPM && hours !== 12) hours += 12;
+  if (!isPM && hours === 12) hours = 0;
+  return new Date(year, month - 1, day, hours, rawM, 0, 0);
+}
+
+function getCountdownLabel(showtimeDt: Date, now: Date): string | null {
+  const diffMs = showtimeDt.getTime() - now.getTime();
+  if (diffMs <= 0) return null;
+  const totalMin = Math.floor(diffMs / 60000);
+  if (totalMin > 24 * 60) return null;
+  if (totalMin < 1) return "Starting now";
+  const hours = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  if (hours > 0) return `in ${hours}h ${mins}m`;
+  return `in ${mins}m`;
+}
+
+const REMINDERS_LS_KEY = "amc-showtime-reminders";
+
+function getReminders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(REMINDERS_LS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveReminders(reminders: Record<string, string>) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(REMINDERS_LS_KEY, JSON.stringify(reminders));
+  } catch { /* ignore */ }
+}
+
+function ShowtimeCountdown({ date, time, amPm }: { date: string; time: string; amPm: string }) {
+  const [label, setLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    const showtimeDt = parseShowtimeDate(date, time, amPm);
+    const update = () => setLabel(getCountdownLabel(showtimeDt, new Date()));
+    update();
+    const id = setInterval(update, 30000);
+    return () => clearInterval(id);
+  }, [date, time, amPm]);
+
+  if (!label) return null;
+  return (
+    <span
+      style={{
+        fontSize: "var(--text-xs)",
+        color: "var(--text-tertiary)",
+        fontVariantNumeric: "tabular-nums",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function ReminderToggle({
+  showtimeId,
+  date,
+  time,
+  amPm,
+}: {
+  showtimeId: string;
+  date: string;
+  time: string;
+  amPm: string;
+}) {
+  const [isSet, setIsSet] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const showtimeDt = parseShowtimeDate(date, time, amPm);
+
+  useEffect(() => {
+    const reminders = getReminders();
+    setIsSet(showtimeId in reminders);
+  }, [showtimeId]);
+
+  // Only show for showtimes at least 65 minutes in the future (so there's time for the reminder)
+  if (showtimeDt.getTime() - Date.now() < 65 * 60 * 1000) return null;
+
+  const handleToggle = async () => {
+    const reminders = getReminders();
+    if (isSet) {
+      delete reminders[showtimeId];
+      saveReminders(reminders);
+      setIsSet(false);
+      setToast("Reminder removed");
+    } else {
+      let permission = "granted";
+      if (typeof Notification !== "undefined" && Notification.permission !== "granted") {
+        permission = await Notification.requestPermission();
+      }
+      if (permission === "denied") {
+        setToast("Notifications blocked — enable in browser settings");
+        setTimeout(() => setToast(null), 3000);
+        return;
+      }
+      reminders[showtimeId] = showtimeDt.toISOString();
+      saveReminders(reminders);
+      setIsSet(true);
+      setToast(`Reminder set for 1hr before ${time} ${amPm.toUpperCase()}`);
+    }
+    setTimeout(() => setToast(null), 2500);
+  };
+
+  return (
+    <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+      <button
+        onClick={handleToggle}
+        title={isSet ? "Remove reminder" : "Remind me 1hr before"}
+        aria-label={isSet ? "Remove 1hr-before reminder" : "Remind me 1hr before this showtime"}
+        data-testid={`reminder-toggle-${showtimeId}`}
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: "4px",
+          color: isSet ? "var(--accent)" : "var(--text-tertiary)",
+          display: "flex",
+          alignItems: "center",
+          transition: "color var(--dur-fast) var(--ease-default)",
+          flexShrink: 0,
+        }}
+      >
+        {isSet ? (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 2a7 7 0 00-7 7v3.586l-1.707 1.707A1 1 0 004 16h16a1 1 0 00.707-1.707L19 12.586V9a7 7 0 00-7-7zm-1.5 18a1.5 1.5 0 003 0h-3z"/>
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 01-3.46 0"/>
+          </svg>
+        )}
+      </button>
+      {toast && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: "calc(100% + 6px)",
+            right: 0,
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border-default)",
+            borderRadius: 6,
+            padding: "6px 10px",
+            fontSize: "var(--text-xs)",
+            color: "var(--text-primary)",
+            whiteSpace: "nowrap",
+            zIndex: 100,
+            pointerEvents: "none",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+          }}
+        >
+          {toast}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =========================================================================
    Skeleton Components
    ========================================================================= */
 function ShowtimeSkeleton() {
@@ -421,6 +596,7 @@ function DateCard({
                   </span>
                 </span>
                 <StatusBadge status={st.status} />
+                <ShowtimeCountdown date={date} time={st.time} amPm={st.amPm} />
                 {st.promo && (
                   <span
                     style={{
@@ -439,17 +615,20 @@ function DateCard({
                   </span>
                 )}
               </div>
-              <a
-                href={st.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-red"
-                data-testid={`buy-tickets-${st.id}`}
-                data-showtime-id={st.id}
-                style={{ padding: "7px 16px", fontSize: "var(--text-sm)" }}
-              >
-                Buy tickets
-              </a>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
+                <ReminderToggle showtimeId={st.id} date={date} time={st.time} amPm={st.amPm} />
+                <a
+                  href={st.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-red"
+                  data-testid={`buy-tickets-${st.id}`}
+                  data-showtime-id={st.id}
+                  style={{ padding: "7px 16px", fontSize: "var(--text-sm)" }}
+                >
+                  Buy tickets
+                </a>
+              </div>
             </div>
           ))}
         </div>
@@ -1378,6 +1557,39 @@ export default function Home() {
       .then((r) => r.json())
       .then((data: { subscribers: number }) => setSubscriberCount(data.subscribers))
       .catch(() => {});
+  }, []);
+
+  // Global reminder checker — fires browser notifications 1hr before saved showtimes
+  useEffect(() => {
+    const checkReminders = () => {
+      if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+      const reminders = getReminders();
+      const now = Date.now();
+      const updated = { ...reminders };
+      let changed = false;
+      for (const [id, isoStr] of Object.entries(reminders)) {
+        const showtimeMs = new Date(isoStr).getTime();
+        const reminderMs = showtimeMs - 60 * 60 * 1000; // 1hr before
+        if (now >= reminderMs && now < showtimeMs) {
+          const showtimeTime = new Date(isoStr).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+          new Notification("Showtime reminder", {
+            body: `Your showtime starts at ${showtimeTime} — 1hr to go!`,
+            icon: "/favicon.svg",
+            tag: `amc-reminder-${id}`,
+          });
+          delete updated[id];
+          changed = true;
+        } else if (now >= showtimeMs) {
+          // Showtime passed — clean up
+          delete updated[id];
+          changed = true;
+        }
+      }
+      if (changed) saveReminders(updated);
+    };
+    checkReminders();
+    const id = setInterval(checkReminders, 60000);
+    return () => clearInterval(id);
   }, []);
 
   const handleShare = async () => {
