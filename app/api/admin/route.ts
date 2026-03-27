@@ -42,6 +42,11 @@ interface DatePrefRow {
   count: number;
 }
 
+interface AbVariantRow {
+  ab_variant: string | null;
+  count: number;
+}
+
 interface ScraperRunRow {
   id: number;
   run_id: string;
@@ -97,6 +102,12 @@ export async function GET(request: NextRequest) {
           { pref_date: "2026-04-02", count: 11 },
         ],
         openRateNote: "Email open tracking not yet implemented",
+        abTest: {
+          variantA: 19,
+          variantB: 23,
+          unassigned: 0,
+          note: "Variant B: 'Be first in line — get instant IMAX alerts' + 'Get instant alerts' CTA",
+        },
       },
       scraper: {
         cacheEntries: 0,
@@ -176,6 +187,19 @@ export async function GET(request: NextRequest) {
       datePrefsRows = results;
     } catch {
       // json_each may fail if dates column is absent or malformed — degrade gracefully
+    }
+
+    // A/B test — signups per variant
+    let abVariantRows: AbVariantRow[] = [];
+    try {
+      const { results } = await db
+        .prepare(
+          "SELECT ab_variant, COUNT(*) as count FROM subscribers WHERE active = 1 GROUP BY ab_variant ORDER BY ab_variant"
+        )
+        .all<AbVariantRow>();
+      abVariantRows = results;
+    } catch {
+      // ab_variant column may not exist on older deployments — degrade gracefully
     }
 
     // Scraper health — try showtime_cache_v2 first, fall back to showtime_cache
@@ -265,6 +289,12 @@ export async function GET(request: NextRequest) {
         signupsByDay: signupsByDayRows,
         datePreferences: datePrefsRows,
         openRateNote: "Email open tracking not yet implemented",
+        abTest: {
+          variantA: abVariantRows.find((r) => r.ab_variant === "A")?.count ?? 0,
+          variantB: abVariantRows.find((r) => r.ab_variant === "B")?.count ?? 0,
+          unassigned: abVariantRows.find((r) => r.ab_variant === null)?.count ?? 0,
+          note: "Variant B: 'Be first in line — get instant IMAX alerts' + 'Get instant alerts' CTA",
+        },
       },
       scraper: {
         cacheEntries,

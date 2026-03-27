@@ -66,6 +66,12 @@ interface AdminData {
     signupsByDay: SignupsByDay[];
     datePreferences: DatePref[];
     openRateNote: string;
+    abTest?: {
+      variantA: number;
+      variantB: number;
+      unassigned: number;
+      note: string;
+    };
   };
   scraper: {
     cacheEntries: number;
@@ -506,6 +512,43 @@ export default function AdminPage() {
                     );
                   })()}
                 </div>
+
+                {/* A/B Test Results */}
+                {data.analytics?.abTest && (() => {
+                  const ab = data.analytics!.abTest!;
+                  const total = ab.variantA + ab.variantB;
+                  const rateA = total > 0 ? Math.round((ab.variantA / total) * 100) : 0;
+                  const rateB = total > 0 ? Math.round((ab.variantB / total) * 100) : 0;
+                  return (
+                    <div style={{ marginTop: "var(--space-xl)", gridColumn: "1 / -1" }}>
+                      <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 var(--space-sm)" }}>
+                        A/B Test — Signup Form
+                      </h3>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-sm)", marginBottom: "var(--space-sm)" }}>
+                        <div style={{ background: "var(--bg-elevated)", borderRadius: 8, padding: "var(--space-md)", border: "1px solid var(--border-subtle)" }}>
+                          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Variant A (Control)</div>
+                          <div style={{ fontSize: 28, fontWeight: 700, color: "var(--text-primary)" }}>{ab.variantA}</div>
+                          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)" }}>signups · {rateA}% of tracked</div>
+                          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginTop: 4, fontStyle: "italic" }}>"Get notified when tickets drop"</div>
+                        </div>
+                        <div style={{ background: "var(--bg-elevated)", borderRadius: 8, padding: "var(--space-md)", border: "1px solid var(--border-subtle)" }}>
+                          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Variant B (Test)</div>
+                          <div style={{ fontSize: 28, fontWeight: 700, color: "var(--text-primary)" }}>{ab.variantB}</div>
+                          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)" }}>signups · {rateB}% of tracked</div>
+                          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginTop: 4, fontStyle: "italic" }}>"Be first in line — get instant IMAX alerts"</div>
+                        </div>
+                      </div>
+                      {ab.unassigned > 0 && (
+                        <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
+                          {ab.unassigned} subscriber{ab.unassigned !== 1 ? "s" : ""} without variant attribution
+                        </div>
+                      )}
+                      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", fontStyle: "italic", marginTop: "var(--space-xs)" }}>
+                        {ab.note}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
