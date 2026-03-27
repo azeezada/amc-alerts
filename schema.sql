@@ -70,3 +70,13 @@ CREATE TABLE IF NOT EXISTS reviews (
   created_at TEXT DEFAULT (datetime('now')),
   UNIQUE (movie_slug, anonymous_id)
 );
+
+CREATE TABLE IF NOT EXISTS discussions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  showtime_id TEXT NOT NULL,
+  anonymous_id TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_discussions_showtime ON discussions(showtime_id, created_at);
