@@ -3008,6 +3008,10 @@ export default function Home() {
   const [inboundRefCode, setInboundRefCode] = useState<string>("");
   const [myReferralCode, setMyReferralCode] = useState<string>("");
   const [referralCopied, setReferralCopied] = useState(false);
+  const [groupEmails, setGroupEmails] = useState("");
+  const [groupStatus, setGroupStatus] = useState<"idle" | "loading" | "done">("idle");
+  const [groupResult, setGroupResult] = useState<{ sent: number; failed: number } | null>(null);
+  const [groupExpanded, setGroupExpanded] = useState(false);
 
   const [newsArticles, setNewsArticles] = useState<NewsArticle[]>([]);
 
@@ -3149,6 +3153,39 @@ export default function Home() {
       setSubStatus("error");
       setSubMsg("Network error. Please try again.");
     }
+  };
+
+  const handleGroupNotify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const emails = groupEmails
+      .split(/[\n,]+/)
+      .map((s) => s.trim().toLowerCase())
+      .filter((s) => s && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s));
+    if (emails.length === 0) return;
+    setGroupStatus("loading");
+    let sent = 0;
+    let failed = 0;
+    for (const email of emails) {
+      try {
+        const resp = await fetch("/api/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            dates: selectedDates,
+            movieSlug: selectedMovie || undefined,
+            movieTitle: movieTitle || undefined,
+            theaterSlugs: selectedTheaters.length > 0 ? selectedTheaters : undefined,
+          }),
+        });
+        if (resp.ok) sent++;
+        else failed++;
+      } catch {
+        failed++;
+      }
+    }
+    setGroupResult({ sent, failed });
+    setGroupStatus("done");
   };
 
   // Initialize from URL params or localStorage
@@ -3381,6 +3418,74 @@ export default function Home() {
                   </button>
                 </div>
               )}
+              {/* Notify my group */}
+              <div style={{ marginTop: "var(--space-sm)" }}>
+                {groupStatus === "done" && groupResult ? (
+                  <p style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", margin: 0 }} data-testid="group-notify-result">
+                    {groupResult.sent > 0
+                      ? `${groupResult.sent} friend${groupResult.sent !== 1 ? "s" : ""} signed up`
+                      : ""}
+                    {groupResult.failed > 0
+                      ? `${groupResult.sent > 0 ? " — " : ""}${groupResult.failed} could not be signed up`
+                      : ""}
+                  </p>
+                ) : !groupExpanded ? (
+                  <button
+                    className="btn-ghost"
+                    style={{ fontSize: "var(--text-xs)" }}
+                    onClick={() => setGroupExpanded(true)}
+                    data-testid="group-notify-toggle"
+                  >
+                    Notify my group
+                  </button>
+                ) : (
+                  <form
+                    onSubmit={handleGroupNotify}
+                    style={{ display: "flex", flexDirection: "column", gap: "var(--space-xs)", maxWidth: 360, margin: "0 auto" }}
+                    data-testid="group-notify-form"
+                  >
+                    <label style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)" }}>
+                      Friends&apos; emails (one per line or comma-separated):
+                    </label>
+                    <textarea
+                      value={groupEmails}
+                      onChange={(e) => setGroupEmails(e.target.value)}
+                      placeholder={"friend1@example.com\nfriend2@example.com"}
+                      rows={3}
+                      style={{
+                        resize: "vertical",
+                        fontSize: "var(--text-xs)",
+                        padding: "6px 10px",
+                        background: "var(--surface-2)",
+                        border: "1px solid var(--border)",
+                        borderRadius: 4,
+                        color: "var(--text-primary)",
+                        fontFamily: "inherit",
+                      }}
+                      data-testid="group-emails-textarea"
+                    />
+                    <div style={{ display: "flex", gap: "var(--space-xs)", justifyContent: "center" }}>
+                      <button
+                        type="submit"
+                        className="btn-primary"
+                        style={{ fontSize: "var(--text-xs)", padding: "4px 14px" }}
+                        disabled={groupStatus === "loading" || !groupEmails.trim()}
+                        data-testid="group-notify-submit"
+                      >
+                        {groupStatus === "loading" ? "Signing up..." : "Sign them up"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        style={{ fontSize: "var(--text-xs)", padding: "4px 10px" }}
+                        onClick={() => setGroupExpanded(false)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
             </div>
           ) : (
             <>
