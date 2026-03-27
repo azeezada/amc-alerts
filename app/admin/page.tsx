@@ -27,6 +27,16 @@ interface RecentNotified {
   notified_at: string | null;
 }
 
+interface SignupsByDay {
+  day: string;
+  count: number;
+}
+
+interface DatePref {
+  pref_date: string;
+  count: number;
+}
+
 interface AdminData {
   devMode?: boolean;
   subscribers: {
@@ -37,6 +47,11 @@ interface AdminData {
     byChannel: ByChannel[];
     recentSubscriptions: RecentSub[];
     recentlyNotified: RecentNotified[];
+  };
+  analytics?: {
+    signupsByDay: SignupsByDay[];
+    datePreferences: DatePref[];
+    openRateNote: string;
   };
   scraper: {
     cacheEntries: number;
@@ -379,6 +394,98 @@ export default function AdminPage() {
                 </div>
               </div>
             </div>
+
+            {/* Analytics */}
+            {data.analytics && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "var(--space-md)",
+                  marginBottom: "var(--space-xl)",
+                }}
+              >
+                {/* Signups over time */}
+                <div style={cardStyle}>
+                  <span style={labelStyle}>Signups over time</span>
+                  {data.analytics.signupsByDay.length === 0 ? (
+                    <p style={{ color: "var(--text-tertiary)", fontSize: "var(--text-sm)", margin: 0 }}>No data</p>
+                  ) : (() => {
+                    const maxCount = Math.max(...data.analytics!.signupsByDay.map((d) => d.count), 1);
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {data.analytics!.signupsByDay.slice(0, 14).map((d) => (
+                          <div key={d.day} style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
+                            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", minWidth: 72 }}>
+                              {d.day.slice(5)}
+                            </span>
+                            <div
+                              style={{
+                                height: 14,
+                                borderRadius: 3,
+                                background: "var(--accent)",
+                                opacity: 0.8,
+                                width: `${Math.round((d.count / maxCount) * 100)}%`,
+                                minWidth: 4,
+                                transition: "width 0.3s",
+                              }}
+                            />
+                            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", minWidth: 20 }}>
+                              {d.count}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Date preferences */}
+                <div style={cardStyle}>
+                  <span style={labelStyle}>Date preferences (active subscribers)</span>
+                  {data.analytics.datePreferences.length === 0 ? (
+                    <p style={{ color: "var(--text-tertiary)", fontSize: "var(--text-sm)", margin: 0 }}>No preference data</p>
+                  ) : (() => {
+                    const maxCount = Math.max(...data.analytics!.datePreferences.map((d) => d.count), 1);
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {data.analytics!.datePreferences.map((d) => (
+                          <div key={d.pref_date} style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
+                            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", minWidth: 72 }}>
+                              {d.pref_date.slice(5)}
+                            </span>
+                            <div
+                              style={{
+                                height: 14,
+                                borderRadius: 3,
+                                background: "#22c55e",
+                                opacity: 0.8,
+                                width: `${Math.round((d.count / maxCount) * 100)}%`,
+                                minWidth: 4,
+                                transition: "width 0.3s",
+                              }}
+                            />
+                            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", minWidth: 20 }}>
+                              {d.count}
+                            </span>
+                          </div>
+                        ))}
+                        <div
+                          style={{
+                            marginTop: "var(--space-xs)",
+                            fontSize: "var(--text-xs)",
+                            color: "var(--text-tertiary)",
+                            fontStyle: "italic",
+                          }}
+                        >
+                          {data.analytics!.openRateNote}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
 
             {/* Recent Notifications */}
             <div style={{ ...cardStyle, marginBottom: "var(--space-xl)" }}>

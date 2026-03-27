@@ -32,6 +32,16 @@ interface ChannelCountRow {
   count: number;
 }
 
+interface SignupsByDayRow {
+  day: string;
+  count: number;
+}
+
+interface DatePrefRow {
+  pref_date: string;
+  count: number;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   if (searchParams.get("secret") !== "hailmary") {
@@ -57,6 +67,22 @@ export async function GET(request: NextRequest) {
         ],
         recentSubscriptions: [],
         recentlyNotified: [],
+      },
+      analytics: {
+        signupsByDay: [
+          { day: "2026-03-27", count: 8 },
+          { day: "2026-03-26", count: 15 },
+          { day: "2026-03-25", count: 12 },
+          { day: "2026-03-24", count: 7 },
+        ],
+        datePreferences: [
+          { pref_date: "2026-04-03", count: 32 },
+          { pref_date: "2026-04-04", count: 28 },
+          { pref_date: "2026-04-05", count: 19 },
+          { pref_date: "2026-04-01", count: 14 },
+          { pref_date: "2026-04-02", count: 11 },
+        ],
+        openRateNote: "Email open tracking not yet implemented",
       },
       scraper: {
         cacheEntries: 0,
@@ -106,6 +132,26 @@ export async function GET(request: NextRequest) {
         "SELECT email, movie_title, notification_channel, notified_at FROM subscribers WHERE notified_at IS NOT NULL ORDER BY notified_at DESC LIMIT 10"
       )
       .all<Pick<SubscriberRow, "email" | "movie_title" | "notification_channel" | "notified_at">>();
+
+    // Signups by day (last 30 days)
+    const { results: signupsByDayRows } = await db
+      .prepare(
+        "SELECT strftime('%Y-%m-%d', subscribed_at) as day, COUNT(*) as count FROM subscribers WHERE subscribed_at IS NOT NULL GROUP BY day ORDER BY day DESC LIMIT 30"
+      )
+      .all<SignupsByDayRow>();
+
+    // Date preferences — which showtime dates do subscribers want?
+    let datePrefsRows: DatePrefRow[] = [];
+    try {
+      const { results } = await db
+        .prepare(
+          "SELECT value as pref_date, COUNT(*) as count FROM subscribers, json_each(dates) WHERE active = 1 GROUP BY value ORDER BY value"
+        )
+        .all<DatePrefRow>();
+      datePrefsRows = results;
+    } catch {
+      // json_each may fail if dates column is absent or malformed — degrade gracefully
+    }
 
     // Scraper health — try showtime_cache_v2 first, fall back to showtime_cache
     let cacheEntries = 0;
@@ -160,6 +206,11 @@ export async function GET(request: NextRequest) {
         byChannel: byChannelRows,
         recentSubscriptions: recentSubs,
         recentlyNotified,
+      },
+      analytics: {
+        signupsByDay: signupsByDayRows,
+        datePreferences: datePrefsRows,
+        openRateNote: "Email open tracking not yet implemented",
       },
       scraper: {
         cacheEntries,
