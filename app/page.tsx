@@ -2139,6 +2139,55 @@ function SaleHistoryBadge({ movieSlug }: { movieSlug: string }) {
   );
 }
 
+interface SelloutSpeedEntry {
+  theater_name: string;
+  format_label: string;
+  speed_hours: number;
+}
+
+function SelloutSpeedBadge({ movieSlug }: { movieSlug: string }) {
+  const [speeds, setSpeeds] = useState<SelloutSpeedEntry[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/soldout-history?movie=${encodeURIComponent(movieSlug)}`)
+      .then((r) => r.json())
+      .then((data: { selloutSpeeds?: SelloutSpeedEntry[] }) => {
+        if (data.selloutSpeeds && data.selloutSpeeds.length > 0) {
+          setSpeeds(data.selloutSpeeds.slice(0, 3));
+        }
+      })
+      .catch(() => {});
+  }, [movieSlug]);
+
+  if (speeds.length === 0) return null;
+
+  const fastest = speeds[0];
+  return (
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        background: "rgba(239, 68, 68, 0.08)",
+        border: "1px solid rgba(239, 68, 68, 0.25)",
+        borderRadius: 8,
+        padding: "6px 12px",
+        fontSize: "var(--text-sm)",
+        color: "var(--text-secondary)",
+      }}
+    >
+      <span style={{ fontSize: 16 }}>🔥</span>
+      <span>
+        Showtimes selling fast —{" "}
+        <strong style={{ color: "#ef4444" }}>
+          {fastest.theater_name} {fastest.format_label} sold out in {fastest.speed_hours}h
+        </strong>
+        {speeds.length > 1 ? ` (+${speeds.length - 1} more)` : ""}
+      </span>
+    </div>
+  );
+}
+
 function NewsSection({ articles }: { articles: NewsArticle[] }) {
   if (articles.length === 0) return null;
 
@@ -3311,8 +3360,9 @@ export default function Home() {
 
             {/* ===== SALE HISTORY BADGE ===== */}
             {selectedMovie && (
-              <div style={{ marginTop: "var(--space-xl)" }}>
+              <div style={{ marginTop: "var(--space-xl)", display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
                 <SaleHistoryBadge movieSlug={selectedMovie} />
+                <SelloutSpeedBadge movieSlug={selectedMovie} />
               </div>
             )}
 

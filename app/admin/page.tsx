@@ -76,9 +76,37 @@ interface PriceMovieChart {
   total_observations: number;
 }
 
+interface SelloutSpeedEntry {
+  showtime_id: string;
+  theater_name: string;
+  format_label: string;
+  showtime_date: string;
+  showtime_time: string;
+  first_available_at: string;
+  sold_out_at: string;
+  speed_hours: number;
+}
+
+interface SoldOutHistoryData {
+  movie_slug: string;
+  transitions: number;
+  selloutSpeeds: SelloutSpeedEntry[];
+  devMode?: boolean;
+}
+
 interface PriceHistoryData {
   charts: PriceMovieChart[];
   devMode?: boolean;
+}
+
+interface EmailTracking {
+  totalOpens: number;
+  uniqueOpeners: number;
+  totalClicks: number;
+  uniqueClickers: number;
+  openRate: number;
+  clickRate: number;
+  topClickedUrls: { url: string; count: number }[];
 }
 
 interface AdminData {
@@ -95,7 +123,6 @@ interface AdminData {
   analytics?: {
     signupsByDay: SignupsByDay[];
     datePreferences: DatePref[];
-    openRateNote: string;
     abTest?: {
       variantA: number;
       variantB: number;
@@ -103,6 +130,7 @@ interface AdminData {
       note: string;
     };
   };
+  emailTracking?: EmailTracking;
   scraper: {
     cacheEntries: number;
     lastCheckedAt: string | null;
@@ -157,6 +185,7 @@ export default function AdminPage() {
   const [data, setData] = useState<AdminData | null>(null);
   const [error, setError] = useState("");
   const [priceHistory, setPriceHistory] = useState<PriceHistoryData | null>(null);
+  const [soldOutHistory, setSoldOutHistory] = useState<SoldOutHistoryData | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -191,6 +220,16 @@ export default function AdminPage() {
         }
       } catch {
         // Non-fatal — price history may not be available yet
+      }
+      // Fetch soldout history
+      try {
+        const soResp = await fetch("/api/soldout-history");
+        if (soResp.ok) {
+          const soJson = await soResp.json() as SoldOutHistoryData;
+          setSoldOutHistory(soJson);
+        }
+      } catch {
+        // Non-fatal
       }
     } catch {
       setError("Network error");
@@ -539,16 +578,6 @@ export default function AdminPage() {
                             </span>
                           </div>
                         ))}
-                        <div
-                          style={{
-                            marginTop: "var(--space-xs)",
-                            fontSize: "var(--text-xs)",
-                            color: "var(--text-tertiary)",
-                            fontStyle: "italic",
-                          }}
-                        >
-                          {data.analytics!.openRateNote}
-                        </div>
                       </div>
                     );
                   })()}
@@ -590,6 +619,75 @@ export default function AdminPage() {
                     </div>
                   );
                 })()}
+              </div>
+            )}
+
+            {/* Email Tracking */}
+            {data.emailTracking && (
+              <div style={{ marginBottom: "var(--space-xl)" }}>
+                <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 var(--space-md)" }}>
+                  Email Tracking
+                </h2>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                    gap: "var(--space-sm)",
+                    marginBottom: "var(--space-md)",
+                  }}
+                >
+                  <div style={cardStyle}>
+                    <span style={labelStyle}>Open rate</span>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: data.emailTracking.openRate >= 30 ? "#22c55e" : data.emailTracking.openRate >= 15 ? "#f59e0b" : "var(--text-primary)" }}>
+                      {data.emailTracking.openRate}%
+                    </div>
+                    <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginTop: 2 }}>
+                      {data.emailTracking.uniqueOpeners} unique openers
+                    </div>
+                  </div>
+                  <div style={cardStyle}>
+                    <span style={labelStyle}>Click rate</span>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: data.emailTracking.clickRate >= 10 ? "#22c55e" : data.emailTracking.clickRate >= 5 ? "#f59e0b" : "var(--text-primary)" }}>
+                      {data.emailTracking.clickRate}%
+                    </div>
+                    <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginTop: 2 }}>
+                      {data.emailTracking.uniqueClickers} unique clickers
+                    </div>
+                  </div>
+                  <div style={cardStyle}>
+                    <span style={labelStyle}>Total opens</span>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: "var(--text-primary)" }}>
+                      {data.emailTracking.totalOpens}
+                    </div>
+                    <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginTop: 2 }}>
+                      all-time
+                    </div>
+                  </div>
+                  <div style={cardStyle}>
+                    <span style={labelStyle}>Total clicks</span>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: "var(--text-primary)" }}>
+                      {data.emailTracking.totalClicks}
+                    </div>
+                    <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginTop: 2 }}>
+                      all-time
+                    </div>
+                  </div>
+                </div>
+                {data.emailTracking.topClickedUrls.length > 0 && (
+                  <div style={cardStyle}>
+                    <span style={labelStyle}>Top clicked URLs</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-xs)" }}>
+                      {data.emailTracking.topClickedUrls.map((item, i) => (
+                        <div key={i} style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", fontSize: "var(--text-xs)" }}>
+                          <span style={{ color: "var(--text-tertiary)", minWidth: 20, textAlign: "right" }}>{item.count}×</span>
+                          <span style={{ color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {item.url}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -896,6 +994,63 @@ export default function AdminPage() {
                 </table>
               )}
             </div>
+
+            {/* Sold Out History */}
+            {soldOutHistory && (
+              <div style={{ ...cardStyle, marginTop: "var(--space-xl)" }}>
+                <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 700, marginBottom: "var(--space-md)", color: "var(--text-primary)" }}>
+                  Sold Out Speed Tracker
+                </h2>
+                <div style={{ display: "flex", gap: "var(--space-lg)", marginBottom: "var(--space-md)" }}>
+                  <div>
+                    <span style={labelStyle}>Total Status Transitions</span>
+                    <span style={{ ...statNumStyle, fontSize: 28 }}>{soldOutHistory.transitions}</span>
+                  </div>
+                  <div>
+                    <span style={labelStyle}>Showtimes Sold Out</span>
+                    <span style={{ ...statNumStyle, fontSize: 28 }}>{soldOutHistory.selloutSpeeds.length}</span>
+                  </div>
+                  {soldOutHistory.selloutSpeeds.length > 0 && (
+                    <div>
+                      <span style={labelStyle}>Fastest Sellout</span>
+                      <span style={{ ...statNumStyle, fontSize: 28 }}>
+                        {soldOutHistory.selloutSpeeds[0].speed_hours}h
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {soldOutHistory.selloutSpeeds.length === 0 ? (
+                  <p style={{ color: "var(--text-tertiary)", fontSize: "var(--text-sm)" }}>
+                    No sold-out showtimes recorded yet. Status transitions will appear here once showtimes sell out.
+                  </p>
+                ) : (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: "left", color: "var(--text-tertiary)", fontWeight: 600, padding: "4px 0", borderBottom: "1px solid var(--border)" }}>Theater</th>
+                        <th style={{ textAlign: "left", color: "var(--text-tertiary)", fontWeight: 600, padding: "4px 8px", borderBottom: "1px solid var(--border)" }}>Format</th>
+                        <th style={{ textAlign: "left", color: "var(--text-tertiary)", fontWeight: 600, padding: "4px 8px", borderBottom: "1px solid var(--border)" }}>Date</th>
+                        <th style={{ textAlign: "left", color: "var(--text-tertiary)", fontWeight: 600, padding: "4px 8px", borderBottom: "1px solid var(--border)" }}>Time</th>
+                        <th style={{ textAlign: "right", color: "var(--text-tertiary)", fontWeight: 600, padding: "4px 0", borderBottom: "1px solid var(--border)" }}>Sold out in</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {soldOutHistory.selloutSpeeds.map((entry, i) => (
+                        <tr key={i} style={{ borderBottom: "1px solid var(--border)" }}>
+                          <td style={{ padding: "6px 0", color: "var(--text-secondary)" }}>{entry.theater_name}</td>
+                          <td style={{ padding: "6px 8px", color: "var(--text-secondary)" }}>{entry.format_label}</td>
+                          <td style={{ padding: "6px 8px", color: "var(--text-secondary)" }}>{entry.showtime_date}</td>
+                          <td style={{ padding: "6px 8px", color: "var(--text-secondary)" }}>{entry.showtime_time}</td>
+                          <td style={{ padding: "6px 0", textAlign: "right", color: entry.speed_hours < 2 ? "#ef4444" : entry.speed_hours < 12 ? "#f59e0b" : "var(--text-secondary)", fontWeight: 600 }}>
+                            {entry.speed_hours}h
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
 
             {/* Refresh button */}
             <div style={{ textAlign: "center", marginTop: "var(--space-xl)" }}>
