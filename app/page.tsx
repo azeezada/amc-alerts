@@ -2432,6 +2432,195 @@ function WeekendHeatmap({ movieSlug }: { movieSlug: string }) {
   );
 }
 
+const FORMAT_PRICE_INFO = [
+  {
+    tag: "imax70mm",
+    label: "IMAX 70mm",
+    priceRange: "$32–38",
+    bestFor: "Purists & film lovers",
+    badge: "BEST",
+    badgeColor: "var(--accent)",
+  },
+  {
+    tag: "dolbycinema",
+    label: "Dolby Cinema",
+    priceRange: "$28–34",
+    bestFor: "Immersive audio",
+    badge: null as string | null,
+    badgeColor: null as string | null,
+  },
+  {
+    tag: "imax",
+    label: "Standard IMAX",
+    priceRange: "$22–28",
+    bestFor: "Best value IMAX",
+    badge: "VALUE",
+    badgeColor: "#22c55e",
+  },
+];
+
+function PriceComparisonTable({ theaters }: { theaters: Record<string, TheaterData> | undefined }) {
+  const promosByFormat = useMemo(() => {
+    if (!theaters) return {} as Record<string, string[]>;
+    const result: Record<string, Set<string>> = {};
+    for (const theaterData of Object.values(theaters)) {
+      for (const [formatTag, formatData] of Object.entries(theaterData.formats)) {
+        for (const dateResult of Object.values(formatData.dates)) {
+          for (const st of dateResult.showtimes) {
+            if (st.promo) {
+              if (!result[formatTag]) result[formatTag] = new Set<string>();
+              result[formatTag].add(st.promo);
+            }
+          }
+        }
+      }
+    }
+    return Object.fromEntries(
+      Object.entries(result).map(([k, v]) => [k, [...v]])
+    ) as Record<string, string[]>;
+  }, [theaters]);
+
+  if (!theaters) return null;
+
+  return (
+    <div style={{ marginTop: "var(--space-2xl)" }}>
+      <h3
+        style={{
+          margin: "0 0 var(--space-md)",
+          fontSize: "var(--text-xs)",
+          fontWeight: 700,
+          color: "var(--text-tertiary)",
+          textTransform: "uppercase",
+          letterSpacing: "1.5px",
+        }}
+      >
+        Format Price Comparison
+      </h3>
+      <div
+        style={{
+          border: "1px solid var(--border-subtle)",
+          borderRadius: 12,
+          overflow: "hidden",
+        }}
+      >
+        {/* Header row */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 90px 150px 1fr",
+            gap: "var(--space-base)",
+            padding: "var(--space-sm) var(--space-xl)",
+            background: "rgba(255,255,255,0.04)",
+            borderBottom: "1px solid var(--border-subtle)",
+          }}
+        >
+          {["Format", "Est. Price", "Active Promo", "Best For"].map((h) => (
+            <span
+              key={h}
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: "var(--text-quaternary, #555)",
+                textTransform: "uppercase",
+                letterSpacing: "0.8px",
+              }}
+            >
+              {h}
+            </span>
+          ))}
+        </div>
+        {FORMAT_PRICE_INFO.map((fmt, i) => {
+          const promos = promosByFormat[fmt.tag] ?? [];
+          return (
+            <div
+              key={fmt.tag}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 90px 150px 1fr",
+                alignItems: "center",
+                gap: "var(--space-base)",
+                padding: "var(--space-md) var(--space-xl)",
+                borderTop: i === 0 ? "none" : "1px solid var(--border-subtle)",
+                background: i % 2 === 0 ? "rgba(255,255,255,0.02)" : "transparent",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span
+                  style={{
+                    fontWeight: 600,
+                    color: "var(--text-primary)",
+                    fontSize: "var(--text-sm)",
+                  }}
+                >
+                  {fmt.label}
+                </span>
+                {fmt.badge && (
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: fmt.badgeColor ?? "var(--accent)",
+                      border: `1px solid ${fmt.badgeColor ?? "var(--accent)"}`,
+                      borderRadius: 4,
+                      padding: "1px 5px",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                    }}
+                  >
+                    {fmt.badge}
+                  </span>
+                )}
+              </div>
+              <div
+                style={{
+                  fontVariantNumeric: "tabular-nums",
+                  fontSize: "var(--text-sm)",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                {fmt.priceRange}
+              </div>
+              <div>
+                {promos.length > 0 ? (
+                  <span
+                    style={{
+                      fontSize: "var(--text-xs)",
+                      fontWeight: 700,
+                      color: "#22c55e",
+                      background: "rgba(34,197,94,0.12)",
+                      border: "1px solid rgba(34,197,94,0.3)",
+                      borderRadius: 6,
+                      padding: "2px 8px",
+                    }}
+                  >
+                    {promos[0]}
+                  </span>
+                ) : (
+                  <span style={{ fontSize: "var(--text-xs)", color: "var(--text-quaternary, #555)" }}>
+                    —
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
+                {fmt.bestFor}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p
+        style={{
+          margin: "var(--space-sm) 0 0",
+          fontSize: "var(--text-xs)",
+          color: "var(--text-quaternary, #555)",
+        }}
+      >
+        Prices are estimates based on NYC AMC listings. Active promos sourced live from AMC.
+      </p>
+    </div>
+  );
+}
+
 function NewsSection({ articles }: { articles: NewsArticle[] }) {
   if (articles.length === 0) return null;
 
@@ -3612,6 +3801,9 @@ export default function Home() {
 
             {/* ===== OPENING WEEKEND HEATMAP ===== */}
             {selectedMovie && <WeekendHeatmap movieSlug={selectedMovie} />}
+
+            {/* ===== PRICE COMPARISON TABLE ===== */}
+            <PriceComparisonTable theaters={status?.theaters} />
 
             {/* ===== COMPETITOR COMPARISON ===== */}
             {movieTitle && (
