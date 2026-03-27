@@ -230,12 +230,22 @@ function getCountdownLabel(showtimeDt: Date, now: Date): string | null {
   const diffMs = showtimeDt.getTime() - now.getTime();
   if (diffMs <= 0) return null;
   const totalMin = Math.floor(diffMs / 60000);
-  if (totalMin > 24 * 60) return null;
   if (totalMin < 1) return "Starting now";
-  const hours = Math.floor(totalMin / 60);
+  const totalHours = Math.floor(totalMin / 60);
   const mins = totalMin % 60;
-  if (hours > 0) return `in ${hours}h ${mins}m`;
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  if (days > 0) return hours > 0 ? `in ${days}d ${hours}h` : `in ${days}d`;
+  if (totalHours > 0) return `in ${totalHours}h ${mins}m`;
   return `in ${mins}m`;
+}
+
+function getCountdownUrgency(showtimeDt: Date, now: Date): "imminent" | "today" | "future" {
+  const diffMs = showtimeDt.getTime() - now.getTime();
+  const totalMin = Math.floor(diffMs / 60000);
+  if (totalMin <= 60) return "imminent";
+  if (totalMin <= 24 * 60) return "today";
+  return "future";
 }
 
 const REMINDERS_LS_KEY = "amc-showtime-reminders";
@@ -259,26 +269,48 @@ function saveReminders(reminders: Record<string, string>) {
 
 function ShowtimeCountdown({ date, time, amPm }: { date: string; time: string; amPm: string }) {
   const [label, setLabel] = useState<string | null>(null);
+  const [urgency, setUrgency] = useState<"imminent" | "today" | "future">("future");
 
   useEffect(() => {
     const showtimeDt = parseShowtimeDate(date, time, amPm);
-    const update = () => setLabel(getCountdownLabel(showtimeDt, new Date()));
+    const update = () => {
+      const now = new Date();
+      setLabel(getCountdownLabel(showtimeDt, now));
+      setUrgency(getCountdownUrgency(showtimeDt, now));
+    };
     update();
     const id = setInterval(update, 30000);
     return () => clearInterval(id);
   }, [date, time, amPm]);
 
   if (!label) return null;
+
+  const colorMap = {
+    imminent: { color: "#F59E0B", bg: "rgba(245,158,11,0.12)", border: "rgba(245,158,11,0.35)" },
+    today:    { color: "var(--accent)", bg: "rgba(220,38,38,0.10)", border: "rgba(220,38,38,0.25)" },
+    future:   { color: "var(--text-tertiary)", bg: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.12)" },
+  };
+  const { color, bg, border } = colorMap[urgency];
+
   return (
     <span
+      data-testid="showtime-countdown-badge"
       style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3,
         fontSize: "var(--text-xs)",
-        color: "var(--text-tertiary)",
         fontVariantNumeric: "tabular-nums",
         whiteSpace: "nowrap",
+        color,
+        background: bg,
+        border: `1px solid ${border}`,
+        borderRadius: 4,
+        padding: "2px 6px",
+        letterSpacing: "0.01em",
       }}
     >
-      {label}
+      ⏱ {label}
     </span>
   );
 }
