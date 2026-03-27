@@ -23,8 +23,9 @@ export async function POST(request: NextRequest) {
       theaterSlugs?: string[];
       phone?: string;
       channel?: string;
+      abVariant?: string;
     };
-    const { email, dates, turnstileToken, movieSlug, movieTitle, theaterSlugs, phone, channel } = body;
+    const { email, dates, turnstileToken, movieSlug, movieTitle, theaterSlugs, phone, channel, abVariant } = body;
 
     // Verify Turnstile token if provided (skip in dev)
     if (turnstileToken) {
@@ -78,8 +79,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Phone number required for SMS alerts" }, { status: 400 });
     }
 
+    const validVariants = ["A", "B"];
+    const subAbVariant = abVariant && validVariants.includes(abVariant) ? abVariant : null;
+
     if (!db) {
-      console.log(`[DEV] Would subscribe: ${email} for dates: ${selectedDates.join(", ")}, movie: ${subMovieSlug}, theaters: ${subTheaterSlugs?.join(", ") ?? "all"}, channel: ${subChannel}`);
+      console.log(`[DEV] Would subscribe: ${email} for dates: ${selectedDates.join(", ")}, movie: ${subMovieSlug}, theaters: ${subTheaterSlugs?.join(", ") ?? "all"}, channel: ${subChannel}, variant: ${subAbVariant}`);
       return NextResponse.json({
         success: true,
         message: subChannel === "email"
@@ -105,8 +109,8 @@ export async function POST(request: NextRequest) {
         });
       } else {
         await db
-          .prepare("UPDATE subscribers SET active = 1, dates = ?, movie_slug = ?, movie_title = ?, theater_slugs = ?, phone_number = ?, notification_channel = ?, subscribed_at = datetime('now') WHERE email = ?")
-          .bind(JSON.stringify(selectedDates), subMovieSlug, subMovieTitle, subTheaterSlugs ? JSON.stringify(subTheaterSlugs) : null, subPhone, subChannel, email)
+          .prepare("UPDATE subscribers SET active = 1, dates = ?, movie_slug = ?, movie_title = ?, theater_slugs = ?, phone_number = ?, notification_channel = ?, ab_variant = ?, subscribed_at = datetime('now') WHERE email = ?")
+          .bind(JSON.stringify(selectedDates), subMovieSlug, subMovieTitle, subTheaterSlugs ? JSON.stringify(subTheaterSlugs) : null, subPhone, subChannel, subAbVariant, email)
           .run();
         return NextResponse.json({
           success: true,
@@ -116,8 +120,8 @@ export async function POST(request: NextRequest) {
     }
 
     await db
-      .prepare("INSERT INTO subscribers (email, dates, movie_slug, movie_title, theater_slugs, phone_number, notification_channel) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .bind(email, JSON.stringify(selectedDates), subMovieSlug, subMovieTitle, subTheaterSlugs ? JSON.stringify(subTheaterSlugs) : null, subPhone, subChannel)
+      .prepare("INSERT INTO subscribers (email, dates, movie_slug, movie_title, theater_slugs, phone_number, notification_channel, ab_variant) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(email, JSON.stringify(selectedDates), subMovieSlug, subMovieTitle, subTheaterSlugs ? JSON.stringify(subTheaterSlugs) : null, subPhone, subChannel, subAbVariant)
       .run();
 
     return NextResponse.json({

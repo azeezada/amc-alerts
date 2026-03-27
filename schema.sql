@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS subscribers (
   notification_channel TEXT DEFAULT 'email',
   subscribed_at TEXT DEFAULT (datetime('now')),
   notified_at TEXT,
-  active INTEGER DEFAULT 1
+  active INTEGER DEFAULT 1,
+  ab_variant TEXT DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS showtime_cache (
