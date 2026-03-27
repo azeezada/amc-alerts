@@ -1698,6 +1698,7 @@ export default function Home() {
   const [subMsg, setSubMsg] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const turnstileRef = useRef<HTMLDivElement>(null);
+  const [abVariant, setAbVariant] = useState<"A" | "B">("A");
 
   const [newsArticles, setNewsArticles] = useState<NewsArticle[]>([]);
 
@@ -1707,6 +1708,19 @@ export default function Home() {
       .then((r) => r.json())
       .then((data: { subscribers: number }) => setSubscriberCount(data.subscribers))
       .catch(() => {});
+  }, []);
+
+  // A/B test: assign variant on first load, persist in localStorage
+  useEffect(() => {
+    const LS_AB_KEY = "amc-ab-variant";
+    const stored = localStorage.getItem(LS_AB_KEY);
+    if (stored === "A" || stored === "B") {
+      setAbVariant(stored);
+    } else {
+      const assigned: "A" | "B" = Math.random() < 0.5 ? "A" : "B";
+      localStorage.setItem(LS_AB_KEY, assigned);
+      setAbVariant(assigned);
+    }
   }, []);
 
   // Fetch news feed
@@ -1806,6 +1820,7 @@ export default function Home() {
           turnstileToken,
           channel: subChannel,
           phone: subChannel !== "email" ? subPhone : undefined,
+          abVariant,
         }),
       });
       const data = await resp.json();
@@ -2014,15 +2029,17 @@ export default function Home() {
             <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", margin: 0 }}>{subMsg}</p>
           ) : (
             <>
-              <p style={{ margin: "0 0 var(--space-sm)", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-primary)" }}>
-                Get notified when tickets drop
+              <p style={{ margin: "0 0 var(--space-sm)", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-primary)" }} data-ab-variant={abVariant}>
+                {abVariant === "B"
+                  ? "Be first in line — get instant IMAX alerts"
+                  : "Get notified when tickets drop"}
               </p>
               <form onSubmit={handleSubscribe} style={{ display: "flex", gap: "var(--space-sm)", maxWidth: 480, margin: "0 auto", flexWrap: "wrap", justifyContent: "center" }}>
                 <input
                   type="email"
                   value={subEmail}
                   onChange={(e) => setSubEmail(e.target.value)}
-                  placeholder="you@example.com"
+                  placeholder={abVariant === "B" ? "Enter your email for instant alerts" : "you@example.com"}
                   required
                   style={{ flex: 1, minWidth: 200 }}
                 />
@@ -2042,7 +2059,7 @@ export default function Home() {
                   className="btn-primary"
                   disabled={subStatus === "loading" || !subEmail || (subChannel !== "email" && !subPhone)}
                 >
-                  {subStatus === "loading" ? "Subscribing..." : "Notify me"}
+                  {subStatus === "loading" ? "Subscribing..." : abVariant === "B" ? "Get instant alerts" : "Notify me"}
                 </button>
                 <div style={{ width: "100%", display: "flex", gap: "var(--space-md)", justifyContent: "center", marginTop: "var(--space-xs)" }}>
                   {(["email", "sms", "both"] as const).map((ch) => (
