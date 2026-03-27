@@ -378,6 +378,90 @@ function ReminderToggle({
 }
 
 /* =========================================================================
+   RSVP Button — "I'm going!" toggle with live count
+   ========================================================================= */
+function getAnonymousId(): string {
+  const key = "amc_anonymous_id";
+  let id = localStorage.getItem(key);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(key, id);
+  }
+  return id;
+}
+
+function RsvpButton({ showtimeId }: { showtimeId: string }) {
+  const [count, setCount] = useState(0);
+  const [going, setGoing] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const aid = getAnonymousId();
+    fetch(`/api/rsvp?showtime_id=${encodeURIComponent(showtimeId)}&anonymous_id=${encodeURIComponent(aid)}`)
+      .then((r) => r.json())
+      .then((d: { count?: number; going?: boolean }) => {
+        setCount(d.count ?? 0);
+        setGoing(d.going ?? false);
+      })
+      .catch(() => {});
+  }, [showtimeId]);
+
+  const handleToggle = async () => {
+    if (loading) return;
+    setLoading(true);
+    const aid = getAnonymousId();
+    const action = going ? "remove" : "add";
+    try {
+      const res = await fetch("/api/rsvp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ showtime_id: showtimeId, anonymous_id: aid, action }),
+      });
+      if (res.ok) {
+        const d = (await res.json()) as { count?: number; going?: boolean };
+        setCount(d.count ?? count);
+        setGoing(d.going ?? !going);
+      }
+    } catch {
+      // silent
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleToggle}
+      disabled={loading}
+      title={going ? "Remove RSVP" : "I'm going!"}
+      aria-label={going ? "Remove RSVP for this showtime" : "RSVP: I'm going to this showtime"}
+      data-testid={`rsvp-toggle-${showtimeId}`}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        background: going ? "rgba(239, 68, 68, 0.12)" : "none",
+        border: going ? "1px solid rgba(239, 68, 68, 0.35)" : "1px solid var(--border-subtle)",
+        borderRadius: 6,
+        cursor: loading ? "default" : "pointer",
+        padding: "3px 8px",
+        color: going ? "var(--accent)" : "var(--text-tertiary)",
+        fontSize: "var(--text-xs)",
+        fontWeight: 600,
+        transition: "color var(--dur-fast) var(--ease-default), background var(--dur-fast) var(--ease-default)",
+        flexShrink: 0,
+        opacity: loading ? 0.6 : 1,
+      }}
+    >
+      <svg width="12" height="12" viewBox="0 0 24 24" fill={going ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+      </svg>
+      {count > 0 ? `${count} going` : "I'm going"}
+    </button>
+  );
+}
+
+/* =========================================================================
    Skeleton Components
    ========================================================================= */
 function ShowtimeSkeleton() {
@@ -615,7 +699,8 @@ function DateCard({
                   </span>
                 )}
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", flexWrap: "wrap" }}>
+                <RsvpButton showtimeId={st.id} />
                 <ReminderToggle showtimeId={st.id} date={date} time={st.time} amPm={st.amPm} />
                 <a
                   href={st.url}
