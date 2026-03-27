@@ -45,6 +45,8 @@ export default function PreferencesPage() {
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [selectedTheaters, setSelectedTheaters] = useState<string[]>([]);
   const [allTheaters, setAllTheaters] = useState(false);
+  const [notificationChannel, setNotificationChannel] = useState<"email" | "sms" | "both">("email");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const availableDates = generateNext30Days();
 
   useEffect(() => {
@@ -61,7 +63,7 @@ export default function PreferencesPage() {
     setLoadStatus("loading");
     fetch(`/api/preferences?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`)
       .then((r) => r.json())
-      .then((data: { error?: string; dates?: string[]; theaterSlugs?: string[] | null }) => {
+      .then((data: { error?: string; dates?: string[]; theaterSlugs?: string[] | null; notificationChannel?: string; phoneNumber?: string | null }) => {
         if (data.error) {
           setLoadStatus("error");
           setErrorMsg(data.error);
@@ -75,6 +77,10 @@ export default function PreferencesPage() {
           setAllTheaters(false);
           setSelectedTheaters(data.theaterSlugs);
         }
+        const ch = data.notificationChannel;
+        if (ch === "sms" || ch === "both") setNotificationChannel(ch);
+        else setNotificationChannel("email");
+        setPhoneNumber(data.phoneNumber ?? "");
         setLoadStatus("loaded");
       })
       .catch(() => {
@@ -107,6 +113,8 @@ export default function PreferencesPage() {
           token,
           dates: selectedDates,
           theaterSlugs: allTheaters ? null : selectedTheaters,
+          notificationChannel,
+          phoneNumber: notificationChannel === "email" ? null : phoneNumber,
         }),
       });
       const data = await resp.json() as { success?: boolean; error?: string };
@@ -313,6 +321,72 @@ export default function PreferencesPage() {
                       </label>
                     );
                   })}
+                </div>
+              )}
+            </div>
+
+            {/* Notification channel section */}
+            <div className="card" style={{ padding: "var(--space-lg)", marginBottom: "var(--space-xl)" }}>
+              <label style={labelStyle}>Notification method</label>
+              <p style={{ color: "var(--text-tertiary)", fontSize: "var(--text-xs)", margin: "0 0 var(--space-md)" }}>
+                Choose how you want to receive ticket alerts.
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-xs)" }}>
+                {(["email", "sms", "both"] as const).map((ch) => {
+                  const labels: Record<string, string> = { email: "Email only", sms: "SMS only", both: "Email + SMS" };
+                  const selected = notificationChannel === ch;
+                  return (
+                    <label
+                      key={ch}
+                      data-testid={`channel-option-${ch}`}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "var(--space-sm)",
+                        padding: "var(--space-sm) var(--space-md)",
+                        borderRadius: 4,
+                        background: selected ? "rgba(229, 9, 20, 0.08)" : "var(--bg-elevated)",
+                        border: `1px solid ${selected ? "var(--accent)" : "var(--border)"}`,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="notificationChannel"
+                        value={ch}
+                        checked={selected}
+                        onChange={() => setNotificationChannel(ch)}
+                        data-testid={`channel-radio-${ch}`}
+                      />
+                      <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-primary)" }}>
+                        {labels[ch]}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {/* Phone number input — shown when SMS is selected */}
+              {(notificationChannel === "sms" || notificationChannel === "both") && (
+                <div style={{ marginTop: "var(--space-md)" }}>
+                  <label style={{ ...labelStyle, marginBottom: "var(--space-xs)" }}>Phone number</label>
+                  <input
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="+1 (555) 000-0000"
+                    data-testid="phone-input"
+                    style={{
+                      width: "100%",
+                      padding: "var(--space-sm) var(--space-md)",
+                      borderRadius: 4,
+                      border: "1px solid var(--border)",
+                      background: "var(--bg-elevated)",
+                      color: "var(--text-primary)",
+                      fontSize: "var(--text-sm)",
+                      boxSizing: "border-box",
+                    }}
+                  />
                 </div>
               )}
             </div>

@@ -9,6 +9,8 @@ interface SubscriberRow {
   email: string;
   dates: string;
   theater_slugs: string | null;
+  phone_number: string | null;
+  notification_channel: string | null;
   active: number;
 }
 
@@ -39,12 +41,14 @@ export async function GET(request: NextRequest) {
       email,
       dates: ["2026-04-01", "2026-04-02", "2026-04-03"],
       theaterSlugs: null,
+      notificationChannel: "email",
+      phoneNumber: null,
       active: true,
     });
   }
 
   const row = await db
-    .prepare("SELECT email, dates, theater_slugs, active FROM subscribers WHERE email = ?")
+    .prepare("SELECT email, dates, theater_slugs, phone_number, notification_channel, active FROM subscribers WHERE email = ?")
     .bind(email.toLowerCase().trim())
     .first<SubscriberRow>();
 
@@ -66,6 +70,8 @@ export async function GET(request: NextRequest) {
     email: row.email,
     dates,
     theaterSlugs,
+    notificationChannel: row.notification_channel ?? "email",
+    phoneNumber: row.phone_number ?? null,
     active: !!row.active,
   });
 }
@@ -81,8 +87,10 @@ export async function PATCH(request: NextRequest) {
       token?: string;
       dates?: string[];
       theaterSlugs?: string[] | null;
+      notificationChannel?: string;
+      phoneNumber?: string | null;
     };
-    const { email, token, dates, theaterSlugs } = body;
+    const { email, token, dates, theaterSlugs, notificationChannel, phoneNumber } = body;
 
     if (!email || !token) {
       return NextResponse.json({ error: "Missing email or token" }, { status: 400 });
@@ -107,16 +115,30 @@ export async function PATCH(request: NextRequest) {
     const validTheaterSlugs =
       Array.isArray(theaterSlugs) && theaterSlugs.length > 0 ? theaterSlugs : null;
 
+    // Validate notificationChannel
+    const validChannels = ["email", "sms", "both"];
+    const validChannel = validChannels.includes(notificationChannel ?? "") ? notificationChannel! : "email";
+
+    // Validate phoneNumber — required when channel includes SMS
+    const needsPhone = validChannel === "sms" || validChannel === "both";
+    const phone = typeof phoneNumber === "string" && phoneNumber.trim().length > 0 ? phoneNumber.trim() : null;
+    if (needsPhone && !phone) {
+      return NextResponse.json({ error: "Phone number required for SMS notifications" }, { status: 400 });
+    }
+    const validPhone = needsPhone ? phone : null;
+
     const env = await getCfEnv();
     const db: D1Database | undefined = env.DB;
 
     if (!db) {
-      console.log(`[DEV] Would update preferences for ${email}: dates=${validDates.join(",")}, theaters=${validTheaterSlugs?.join(",") ?? "all"}`);
+      console.log(`[DEV] Would update preferences for ${email}: dates=${validDates.join(",")}, theaters=${validTheaterSlugs?.join(",") ?? "all"}, channel=${validChannel}, phone=${validPhone ?? "n/a"}`);
       return NextResponse.json({
         success: true,
         message: "Preferences updated successfully.",
         dates: validDates,
         theaterSlugs: validTheaterSlugs,
+        notificationChannel: validChannel,
+        phoneNumber: validPhone,
       });
     }
 
@@ -134,10 +156,12 @@ export async function PATCH(request: NextRequest) {
     }
 
     await db
-      .prepare("UPDATE subscribers SET dates = ?, theater_slugs = ? WHERE email = ?")
+      .prepare("UPDATE subscribers SET dates = ?, theater_slugs = ?, notification_channel = ?, phone_number = ? WHERE email = ?")
       .bind(
         JSON.stringify(validDates),
         validTheaterSlugs ? JSON.stringify(validTheaterSlugs) : null,
+        validChannel,
+        validPhone,
         email.toLowerCase().trim()
       )
       .run();
@@ -147,6 +171,8 @@ export async function PATCH(request: NextRequest) {
       message: "Preferences updated successfully.",
       dates: validDates,
       theaterSlugs: validTheaterSlugs,
+      notificationChannel: validChannel,
+      phoneNumber: validPhone,
     });
   } catch (e) {
     console.error("Preferences update error:", e);
