@@ -52,6 +52,10 @@ export function buildEmailHtml(
 
   const unsubLink = unsubscribeToken && email
     ? `<p style="color:#6b7280;font-size:12px;margin-top:24px;text-align:center;">
+        <a href="https://amc-alerts.pages.dev/preferences?token=${encodeURIComponent(unsubscribeToken)}&email=${encodeURIComponent(email)}" style="color:#6b7280;">
+          Manage preferences
+        </a>
+        &nbsp;·&nbsp;
         <a href="https://amc-alerts.pages.dev/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&email=${encodeURIComponent(email)}" style="color:#6b7280;">
           Unsubscribe
         </a>
