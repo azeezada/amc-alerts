@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS subscribers (
   movie_slug TEXT DEFAULT 'project-hail-mary-76779',
   movie_title TEXT DEFAULT 'Project Hail Mary',
   theater_slugs TEXT DEFAULT NULL,
+  phone_number TEXT DEFAULT NULL,
+  notification_channel TEXT DEFAULT 'email',
   subscribed_at TEXT DEFAULT (datetime('now')),
   notified_at TEXT,
   active INTEGER DEFAULT 1

@@ -21,8 +21,10 @@ export async function POST(request: NextRequest) {
       movieSlug?: string;
       movieTitle?: string;
       theaterSlugs?: string[];
+      phone?: string;
+      channel?: string;
     };
-    const { email, dates, turnstileToken, movieSlug, movieTitle, theaterSlugs } = body;
+    const { email, dates, turnstileToken, movieSlug, movieTitle, theaterSlugs, phone, channel } = body;
 
     // Verify Turnstile token if provided (skip in dev)
     if (turnstileToken) {
@@ -68,11 +70,23 @@ export async function POST(request: NextRequest) {
     const subMovieTitle = movieTitle || "Project Hail Mary";
     const subTheaterSlugs = theaterSlugs && theaterSlugs.length > 0 ? theaterSlugs : null;
 
+    // Validate channel and phone
+    const validChannels = ["email", "sms", "both"];
+    const subChannel = channel && validChannels.includes(channel) ? channel : "email";
+    const subPhone = (subChannel === "sms" || subChannel === "both") ? (phone?.trim() || null) : null;
+    if ((subChannel === "sms" || subChannel === "both") && !subPhone) {
+      return NextResponse.json({ error: "Phone number required for SMS alerts" }, { status: 400 });
+    }
+
     if (!db) {
-      console.log(`[DEV] Would subscribe: ${email} for dates: ${selectedDates.join(", ")}, movie: ${subMovieSlug}, theaters: ${subTheaterSlugs?.join(", ") ?? "all"}`);
+      console.log(`[DEV] Would subscribe: ${email} for dates: ${selectedDates.join(", ")}, movie: ${subMovieSlug}, theaters: ${subTheaterSlugs?.join(", ") ?? "all"}, channel: ${subChannel}`);
       return NextResponse.json({
         success: true,
-        message: "You're on the list! We'll email you the moment tickets drop.",
+        message: subChannel === "email"
+          ? "You're on the list! We'll email you the moment tickets drop."
+          : subChannel === "sms"
+          ? "You're on the list! We'll text you the moment tickets drop."
+          : "You're on the list! We'll email and text you the moment tickets drop.",
       });
     }
 
@@ -91,8 +105,8 @@ export async function POST(request: NextRequest) {
         });
       } else {
         await db
-          .prepare("UPDATE subscribers SET active = 1, dates = ?, movie_slug = ?, movie_title = ?, theater_slugs = ?, subscribed_at = datetime('now') WHERE email = ?")
-          .bind(JSON.stringify(selectedDates), subMovieSlug, subMovieTitle, subTheaterSlugs ? JSON.stringify(subTheaterSlugs) : null, email)
+          .prepare("UPDATE subscribers SET active = 1, dates = ?, movie_slug = ?, movie_title = ?, theater_slugs = ?, phone_number = ?, notification_channel = ?, subscribed_at = datetime('now') WHERE email = ?")
+          .bind(JSON.stringify(selectedDates), subMovieSlug, subMovieTitle, subTheaterSlugs ? JSON.stringify(subTheaterSlugs) : null, subPhone, subChannel, email)
           .run();
         return NextResponse.json({
           success: true,
@@ -102,13 +116,17 @@ export async function POST(request: NextRequest) {
     }
 
     await db
-      .prepare("INSERT INTO subscribers (email, dates, movie_slug, movie_title, theater_slugs) VALUES (?, ?, ?, ?, ?)")
-      .bind(email, JSON.stringify(selectedDates), subMovieSlug, subMovieTitle, subTheaterSlugs ? JSON.stringify(subTheaterSlugs) : null)
+      .prepare("INSERT INTO subscribers (email, dates, movie_slug, movie_title, theater_slugs, phone_number, notification_channel) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .bind(email, JSON.stringify(selectedDates), subMovieSlug, subMovieTitle, subTheaterSlugs ? JSON.stringify(subTheaterSlugs) : null, subPhone, subChannel)
       .run();
 
     return NextResponse.json({
       success: true,
-      message: "You're on the list! We'll email you the moment tickets drop.",
+      message: subChannel === "email"
+        ? "You're on the list! We'll email you the moment tickets drop."
+        : subChannel === "sms"
+        ? "You're on the list! We'll text you the moment tickets drop."
+        : "You're on the list! We'll email and text you the moment tickets drop.",
     });
   } catch (e) {
     console.error("Subscribe error:", e);
