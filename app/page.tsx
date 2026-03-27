@@ -1365,6 +1365,8 @@ export default function Home() {
   const [subscriberCount, setSubscriberCount] = useState<number | null>(null);
   const [shareMsg, setShareMsg] = useState("");
   const [subEmail, setSubEmail] = useState("");
+  const [subChannel, setSubChannel] = useState<"email" | "sms" | "both">("email");
+  const [subPhone, setSubPhone] = useState("");
   const [subStatus, setSubStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [subMsg, setSubMsg] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -1430,6 +1432,8 @@ export default function Home() {
           email: subEmail,
           dates: selectedDates,
           turnstileToken,
+          channel: subChannel,
+          phone: subChannel !== "email" ? subPhone : undefined,
         }),
       });
       const data = await resp.json();
@@ -1650,13 +1654,39 @@ export default function Home() {
                   required
                   style={{ flex: 1, minWidth: 200 }}
                 />
+                {subChannel !== "email" && (
+                  <input
+                    type="tel"
+                    value={subPhone}
+                    onChange={(e) => setSubPhone(e.target.value)}
+                    placeholder="+1 (555) 000-0000"
+                    required
+                    style={{ flex: 1, minWidth: 160 }}
+                    data-testid="phone-input"
+                  />
+                )}
                 <button
                   type="submit"
                   className="btn-primary"
-                  disabled={subStatus === "loading" || !subEmail}
+                  disabled={subStatus === "loading" || !subEmail || (subChannel !== "email" && !subPhone)}
                 >
                   {subStatus === "loading" ? "Subscribing..." : "Notify me"}
                 </button>
+                <div style={{ width: "100%", display: "flex", gap: "var(--space-md)", justifyContent: "center", marginTop: "var(--space-xs)" }}>
+                  {(["email", "sms", "both"] as const).map((ch) => (
+                    <label key={ch} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "var(--text-xs)", color: "var(--text-secondary)", cursor: "pointer" }}>
+                      <input
+                        type="radio"
+                        name="notif-channel"
+                        value={ch}
+                        checked={subChannel === ch}
+                        onChange={() => setSubChannel(ch)}
+                        data-testid={`channel-${ch}`}
+                      />
+                      {ch === "email" ? "Email" : ch === "sms" ? "SMS" : "Email + SMS"}
+                    </label>
+                  ))}
+                </div>
                 <div ref={turnstileRef} style={{ width: "100%", display: "flex", justifyContent: "center", marginTop: "var(--space-xs)" }} />
                 {subStatus === "error" && (
                   <p style={{ width: "100%", color: "var(--accent)", fontSize: "var(--text-xs)", margin: "var(--space-xs) 0 0" }}>{subMsg}</p>

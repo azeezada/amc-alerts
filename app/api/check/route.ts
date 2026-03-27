@@ -3,6 +3,7 @@ import { checkAllTheatersAndFormats, DateResult, TARGET_DATES, THEATERS, FORMATS
 import { buildEmailHtml, buildEmailText } from "@/lib/email";
 import { getCfEnv, type D1Database } from "@/lib/cf-env";
 import { generateUnsubscribeToken } from "@/lib/unsubscribe-token";
+import { sendSmsAlert } from "@/lib/sms";
 
 export const runtime = "edge";
 
@@ -17,6 +18,8 @@ interface SubscriberRow {
   movie_slug: string | null;
   movie_title: string | null;
   theater_slugs: string | null;
+  phone_number: string | null;
+  notification_channel: string | null;
 }
 
 interface MovieRow {
@@ -221,7 +224,7 @@ async function runCheck(_request: NextRequest) {
 
     // Fetch all active subscribers once; filter per-movie below
     const { results: subscribers } = await db
-      .prepare("SELECT email, dates, movie_slug, movie_title, theater_slugs FROM subscribers WHERE active = 1")
+      .prepare("SELECT email, dates, movie_slug, movie_title, theater_slugs, phone_number, notification_channel FROM subscribers WHERE active = 1")
       .all<SubscriberRow>();
 
     logLine(`Total active subscribers: ${subscribers.length}`);
@@ -272,13 +275,23 @@ async function runCheck(_request: NextRequest) {
         const movieTitle = sub.movie_title || undefined;
 
         try {
-          await sendEmailViaResend(sub.email, relevantDates, resendApiKey, movieTitle, theaterName);
+          const channel = sub.notification_channel || "email";
+          if (channel === "email" || channel === "both") {
+            await sendEmailViaResend(sub.email, relevantDates, resendApiKey, movieTitle, theaterName);
+          }
+          if ((channel === "sms" || channel === "both") && sub.phone_number) {
+            await sendSmsAlert(sub.phone_number, relevantDates, {
+              TWILIO_ACCOUNT_SID: (env as any).TWILIO_ACCOUNT_SID,
+              TWILIO_AUTH_TOKEN: (env as any).TWILIO_AUTH_TOKEN,
+              TWILIO_PHONE_NUMBER: (env as any).TWILIO_PHONE_NUMBER,
+            }, movieTitle, theaterName);
+          }
           await db
             .prepare("UPDATE subscribers SET notified_at = datetime('now') WHERE email = ?")
             .bind(sub.email)
             .run();
           notified++;
-          logLine(`  ✓ Notified: ${sub.email} (${movieTitle ?? movieSlug} @ ${theaterName})`);
+          logLine(`  ✓ Notified: ${sub.email} via ${channel} (${movieTitle ?? movieSlug} @ ${theaterName})`);
         } catch (e) {
           logLine(`  ✗ Failed to notify ${sub.email}: ${e}`);
         }
