@@ -86,6 +86,9 @@ async function runCheck(_request: NextRequest) {
   const db: D1Database | undefined = env.DB;
   const resendApiKey: string | undefined = env.RESEND_API_KEY;
 
+  const runId = new Date().toISOString();
+  const startMs = Date.now();
+
   const log: string[] = [];
   const logLine = (msg: string) => {
     console.log(msg);
@@ -207,6 +210,7 @@ async function runCheck(_request: NextRequest) {
     logLine(`\nTotal newly available across all movies: ${totalNewEntries}`);
 
     if (totalNewEntries === 0) {
+      await writeScraperRun(db, runId, "success", Date.now() - startMs, moviesToCheck.length, 0, 0);
       return NextResponse.json({ log, notified: 0, newDates: [] });
     }
 
@@ -219,6 +223,7 @@ async function runCheck(_request: NextRequest) {
 
     if (!resendApiKey) {
       logLine("No RESEND_API_KEY set — skipping email");
+      await writeScraperRun(db, runId, "success", Date.now() - startMs, moviesToCheck.length, totalNewEntries, 0);
       return NextResponse.json({ log, notified: 0, newDates: allNewDates, error: "No RESEND_API_KEY" });
     }
 
@@ -300,9 +305,47 @@ async function runCheck(_request: NextRequest) {
     }
 
     logLine(`\n=== Done. Notified ${notified} subscribers across ${moviesToCheck.length} movie(s) ===`);
+    await writeScraperRun(db, runId, "success", Date.now() - startMs, moviesToCheck.length, totalNewEntries, notified);
     return NextResponse.json({ log, notified, newDates: allNewDates });
   } catch (e) {
     logLine(`ERROR: ${e}`);
+    if (db) {
+      await writeScraperRun(db, runId, "error", Date.now() - startMs, 0, 0, 0, String(e));
+    }
     return NextResponse.json({ error: String(e), log }, { status: 500 });
+  }
+}
+
+async function writeScraperRun(
+  db: D1Database | undefined,
+  runId: string,
+  status: "success" | "error",
+  durationMs: number,
+  moviesChecked: number,
+  totalNewShowtimes: number,
+  totalNotified: number,
+  errorMessage?: string
+) {
+  if (!db) return;
+  try {
+    await db
+      .prepare(
+        `INSERT INTO scraper_runs (run_id, status, duration_ms, movies_checked, theaters_checked, formats_checked, total_new_showtimes, total_notified, error_message)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        runId,
+        status,
+        durationMs,
+        moviesChecked,
+        THEATERS.length,
+        FORMATS.length,
+        totalNewShowtimes,
+        totalNotified,
+        errorMessage ?? null
+      )
+      .run();
+  } catch {
+    // Ignore write failures — table may not exist yet on old deployments
   }
 }

@@ -37,6 +37,20 @@ interface DatePref {
   count: number;
 }
 
+interface ScraperRun {
+  id: number;
+  run_id: string;
+  status: string;
+  duration_ms: number | null;
+  movies_checked: number;
+  theaters_checked: number;
+  formats_checked: number;
+  total_new_showtimes: number;
+  total_notified: number;
+  error_message: string | null;
+  ran_at: string | null;
+}
+
 interface AdminData {
   devMode?: boolean;
   subscribers: {
@@ -58,6 +72,14 @@ interface AdminData {
     lastCheckedAt: string | null;
     cacheAgeMinutes: number | null;
     status: "healthy" | "stale" | "degraded" | "unknown";
+  };
+  scraperMonitoring?: {
+    recentRuns: ScraperRun[];
+    totalRuns: number;
+    successRuns: number;
+    errorRuns: number;
+    avgDurationMs: number;
+    successRate: number | null;
   };
   error?: string;
 }
@@ -483,6 +505,131 @@ export default function AdminPage() {
                       </div>
                     );
                   })()}
+                </div>
+              </div>
+            )}
+
+            {/* Scraper Monitoring */}
+            {data.scraperMonitoring && (
+              <div style={{ marginBottom: "var(--space-xl)" }}>
+                <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 var(--space-md)" }}>
+                  Scraper Monitoring
+                </h2>
+
+                {/* Summary stats */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                    gap: "var(--space-sm)",
+                    marginBottom: "var(--space-md)",
+                  }}
+                >
+                  <div style={cardStyle}>
+                    <span style={labelStyle}>Total runs</span>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: "var(--text-primary)" }}>
+                      {data.scraperMonitoring.totalRuns}
+                    </div>
+                  </div>
+                  <div style={cardStyle}>
+                    <span style={labelStyle}>Success rate</span>
+                    <div
+                      style={{
+                        fontSize: 24,
+                        fontWeight: 800,
+                        color: data.scraperMonitoring.successRate === null
+                          ? "var(--text-tertiary)"
+                          : data.scraperMonitoring.successRate >= 95
+                          ? "#22c55e"
+                          : data.scraperMonitoring.successRate >= 80
+                          ? "#f59e0b"
+                          : "#ef4444",
+                      }}
+                    >
+                      {data.scraperMonitoring.successRate === null ? "—" : `${data.scraperMonitoring.successRate}%`}
+                    </div>
+                  </div>
+                  <div style={cardStyle}>
+                    <span style={labelStyle}>Failures</span>
+                    <div
+                      style={{
+                        fontSize: 24,
+                        fontWeight: 800,
+                        color: data.scraperMonitoring.errorRuns > 0 ? "#ef4444" : "var(--text-tertiary)",
+                      }}
+                    >
+                      {data.scraperMonitoring.errorRuns}
+                    </div>
+                  </div>
+                  <div style={cardStyle}>
+                    <span style={labelStyle}>Avg duration</span>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: "var(--text-primary)" }}>
+                      {data.scraperMonitoring.avgDurationMs > 0
+                        ? `${(data.scraperMonitoring.avgDurationMs / 1000).toFixed(1)}s`
+                        : "—"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recent runs table */}
+                <div style={cardStyle}>
+                  <span style={labelStyle}>Recent runs (last 20)</span>
+                  {data.scraperMonitoring.recentRuns.length === 0 ? (
+                    <p style={{ color: "var(--text-tertiary)", fontSize: "var(--text-sm)", margin: 0 }}>
+                      No scraper runs recorded yet
+                    </p>
+                  ) : (
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-xs)" }}>
+                        <thead>
+                          <tr>
+                            <th style={{ textAlign: "left", color: "var(--text-tertiary)", fontWeight: 600, padding: "4px 0", borderBottom: "1px solid var(--border)" }}>Time</th>
+                            <th style={{ textAlign: "left", color: "var(--text-tertiary)", fontWeight: 600, padding: "4px 8px", borderBottom: "1px solid var(--border)" }}>Status</th>
+                            <th style={{ textAlign: "right", color: "var(--text-tertiary)", fontWeight: 600, padding: "4px 8px", borderBottom: "1px solid var(--border)" }}>Duration</th>
+                            <th style={{ textAlign: "right", color: "var(--text-tertiary)", fontWeight: 600, padding: "4px 8px", borderBottom: "1px solid var(--border)" }}>New</th>
+                            <th style={{ textAlign: "right", color: "var(--text-tertiary)", fontWeight: 600, padding: "4px 8px", borderBottom: "1px solid var(--border)" }}>Notified</th>
+                            <th style={{ textAlign: "left", color: "var(--text-tertiary)", fontWeight: 600, padding: "4px 0", borderBottom: "1px solid var(--border)" }}>Error</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.scraperMonitoring.recentRuns.map((run) => (
+                            <tr key={run.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                              <td style={{ padding: "6px 0", color: "var(--text-tertiary)" }}>
+                                {formatRelativeTime(run.ran_at)}
+                              </td>
+                              <td style={{ padding: "6px 8px" }}>
+                                <span
+                                  style={{
+                                    display: "inline-block",
+                                    padding: "2px 6px",
+                                    borderRadius: 3,
+                                    fontSize: "var(--text-xs)",
+                                    fontWeight: 700,
+                                    background: run.status === "success" ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)",
+                                    color: run.status === "success" ? "#22c55e" : "#ef4444",
+                                  }}
+                                >
+                                  {run.status}
+                                </span>
+                              </td>
+                              <td style={{ padding: "6px 8px", textAlign: "right", color: "var(--text-secondary)" }}>
+                                {run.duration_ms !== null ? `${(run.duration_ms / 1000).toFixed(1)}s` : "—"}
+                              </td>
+                              <td style={{ padding: "6px 8px", textAlign: "right", color: run.total_new_showtimes > 0 ? "#22c55e" : "var(--text-tertiary)" }}>
+                                {run.total_new_showtimes}
+                              </td>
+                              <td style={{ padding: "6px 8px", textAlign: "right", color: run.total_notified > 0 ? "var(--text-primary)" : "var(--text-tertiary)" }}>
+                                {run.total_notified}
+                              </td>
+                              <td style={{ padding: "6px 0", color: "#ef4444", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {run.error_message ?? ""}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

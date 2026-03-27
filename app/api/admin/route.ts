@@ -42,6 +42,20 @@ interface DatePrefRow {
   count: number;
 }
 
+interface ScraperRunRow {
+  id: number;
+  run_id: string;
+  status: string;
+  duration_ms: number | null;
+  movies_checked: number;
+  theaters_checked: number;
+  formats_checked: number;
+  total_new_showtimes: number;
+  total_notified: number;
+  error_message: string | null;
+  ran_at: string | null;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   if (searchParams.get("secret") !== "hailmary") {
@@ -89,6 +103,17 @@ export async function GET(request: NextRequest) {
         lastCheckedAt: null,
         cacheAgeMinutes: null,
         status: "unknown",
+      },
+      scraperMonitoring: {
+        recentRuns: [
+          { id: 1, run_id: "2026-03-27T05:00:00.000Z", status: "success", duration_ms: 3200, movies_checked: 1, theaters_checked: 3, formats_checked: 3, total_new_showtimes: 0, total_notified: 0, error_message: null, ran_at: "2026-03-27 05:00:00" },
+          { id: 2, run_id: "2026-03-27T04:45:00.000Z", status: "success", duration_ms: 2950, movies_checked: 1, theaters_checked: 3, formats_checked: 3, total_new_showtimes: 2, total_notified: 12, error_message: null, ran_at: "2026-03-27 04:45:00" },
+        ],
+        totalRuns: 2,
+        successRuns: 2,
+        errorRuns: 0,
+        avgDurationMs: 3075,
+        successRate: 100,
       },
     });
   }
@@ -196,6 +221,35 @@ export async function GET(request: NextRequest) {
       else scraperStatus = "degraded";
     }
 
+    // Scraper run monitoring — last 20 runs
+    let scraperRunRows: ScraperRunRow[] = [];
+    let totalRuns = 0;
+    let successRuns = 0;
+    let errorRuns = 0;
+    let avgDurationMs = 0;
+    try {
+      const { results } = await db
+        .prepare(
+          "SELECT id, run_id, status, duration_ms, movies_checked, theaters_checked, formats_checked, total_new_showtimes, total_notified, error_message, ran_at FROM scraper_runs ORDER BY id DESC LIMIT 20"
+        )
+        .all<ScraperRunRow>();
+      scraperRunRows = results;
+
+      const statsRow = await db
+        .prepare(
+          "SELECT COUNT(*) as total, SUM(CASE WHEN status='success' THEN 1 ELSE 0 END) as successes, SUM(CASE WHEN status='error' THEN 1 ELSE 0 END) as errors, AVG(duration_ms) as avg_ms FROM scraper_runs"
+        )
+        .first<{ total: number; successes: number; errors: number; avg_ms: number | null }>();
+      totalRuns = statsRow?.total ?? 0;
+      successRuns = statsRow?.successes ?? 0;
+      errorRuns = statsRow?.errors ?? 0;
+      avgDurationMs = Math.round(statsRow?.avg_ms ?? 0);
+    } catch {
+      // scraper_runs table may not exist on older deployments
+    }
+
+    const successRate = totalRuns > 0 ? Math.round((successRuns / totalRuns) * 100) : null;
+
     return NextResponse.json({
       devMode: false,
       subscribers: {
@@ -217,6 +271,14 @@ export async function GET(request: NextRequest) {
         lastCheckedAt,
         cacheAgeMinutes,
         status: scraperStatus,
+      },
+      scraperMonitoring: {
+        recentRuns: scraperRunRows,
+        totalRuns,
+        successRuns,
+        errorRuns,
+        avgDurationMs,
+        successRate,
       },
     });
   } catch (e) {

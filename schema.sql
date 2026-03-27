@@ -36,3 +36,17 @@ CREATE TABLE IF NOT EXISTS group_members (
   voted_showtimes TEXT DEFAULT '[]',
   joined_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS scraper_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'success',
+  duration_ms INTEGER,
+  movies_checked INTEGER DEFAULT 0,
+  theaters_checked INTEGER DEFAULT 0,
+  formats_checked INTEGER DEFAULT 0,
+  total_new_showtimes INTEGER DEFAULT 0,
+  total_notified INTEGER DEFAULT 0,
+  error_message TEXT DEFAULT NULL,
+  ran_at TEXT DEFAULT (datetime('now'))
+);
