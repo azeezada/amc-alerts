@@ -1288,15 +1288,17 @@ function TheaterSetup({
   selectedTheaters,
   onSelect,
   onNext,
+  selectedMarket,
+  onMarketChange,
 }: {
   selectedTheaters: string[];
   onSelect: (theaters: string[]) => void;
   onNext: () => void;
+  selectedMarket: string;
+  onMarketChange: (marketSlug: string) => void;
 }) {
-  const [selectedMarket, setSelectedMarket] = useState("new-york-city");
-
   const handleMarketChange = (marketSlug: string) => {
-    setSelectedMarket(marketSlug);
+    onMarketChange(marketSlug);
     onSelect([]); // clear theater selection when city changes
   };
 
@@ -1932,6 +1934,158 @@ interface NewsArticle {
   source: string;
 }
 
+/* =========================================================================
+   Competitor Comparison Component
+   ========================================================================= */
+interface CompetitorTheaterResult {
+  id: string;
+  chain: "regal" | "cinemark";
+  name: string;
+  neighborhood: string;
+  formats: string[];
+  formatLabels: string[];
+  showtimeUrl: string;
+}
+
+function CompetitorComparison({
+  market,
+  movieTitle,
+  selectedDate,
+}: {
+  market: string;
+  movieTitle: string;
+  selectedDate?: string;
+}) {
+  const [theaters, setTheaters] = useState<CompetitorTheaterResult[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!market || !movieTitle) return;
+    const params = new URLSearchParams({ market, movie: movieTitle });
+    if (selectedDate) params.set("date", selectedDate);
+    fetch(`/api/competitors?${params.toString()}`)
+      .then((r) => r.json())
+      .then((data: { theaters?: CompetitorTheaterResult[] }) => {
+        setTheaters(data.theaters ?? []);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, [market, movieTitle, selectedDate]);
+
+  if (!loaded || theaters.length === 0) return null;
+
+  const CHAIN_COLORS: Record<string, string> = {
+    regal: "#1a56db",
+    cinemark: "#e63946",
+  };
+
+  const PREMIUM_FORMATS = new Set(["rpx", "4dx", "screenx", "xd", "imax", "dolby-atmos"]);
+
+  return (
+    <div style={{ marginTop: "var(--space-2xl)" }} data-testid="competitor-comparison">
+      <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-sm)", marginBottom: "var(--space-lg)" }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>
+          Also playing nearby
+        </h2>
+        <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", fontWeight: 500 }}>
+          Regal &amp; Cinemark
+        </span>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+          gap: "var(--space-base)",
+        }}
+      >
+        {theaters.map((t) => {
+          const premiumFormats = t.formatLabels.filter(
+            (_, i) => PREMIUM_FORMATS.has(t.formats[i])
+          );
+          return (
+            <a
+              key={t.id}
+              href={t.showtimeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "block",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid var(--border-subtle)",
+                borderRadius: 10,
+                padding: "var(--space-base) var(--space-lg)",
+                textDecoration: "none",
+                transition: "background 0.15s, border-color 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.08)";
+                (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.2)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
+                (e.currentTarget as HTMLElement).style.borderColor = "var(--border-subtle)";
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginBottom: 6 }}>
+                <span
+                  style={{
+                    fontSize: "var(--text-xs)",
+                    fontWeight: 800,
+                    letterSpacing: "1.5px",
+                    textTransform: "uppercase",
+                    color: CHAIN_COLORS[t.chain] ?? "var(--text-secondary)",
+                    background: `${CHAIN_COLORS[t.chain] ?? "#555"}22`,
+                    padding: "2px 7px",
+                    borderRadius: 4,
+                  }}
+                >
+                  {t.chain === "regal" ? "REGAL" : "CINEMARK"}
+                </span>
+              </div>
+              <div style={{ fontWeight: 600, fontSize: "var(--text-sm)", color: "var(--text-primary)", marginBottom: 2 }}>
+                {t.name}
+              </div>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginBottom: 8 }}>
+                {t.neighborhood}
+              </div>
+              {premiumFormats.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 10 }}>
+                  {premiumFormats.map((f) => (
+                    <span
+                      key={f}
+                      style={{
+                        fontSize: "var(--text-xs)",
+                        fontWeight: 600,
+                        color: "var(--text-secondary)",
+                        background: "rgba(255,255,255,0.08)",
+                        border: "1px solid var(--border-subtle)",
+                        borderRadius: 4,
+                        padding: "1px 6px",
+                      }}
+                    >
+                      {f}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div
+                style={{
+                  fontSize: "var(--text-xs)",
+                  color: "var(--accent)",
+                  fontWeight: 600,
+                }}
+              >
+                Check showtimes &rarr;
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 interface SaleHistoryEntry {
   movie_slug: string;
   first_on_sale_at: string | null;
@@ -2347,6 +2501,7 @@ export default function Home() {
   // Setup flow state
   const [step, setStep] = useState<"setup-theaters" | "setup-movie" | "setup-dates" | "results">("setup-theaters");
   const [selectedTheaters, setSelectedTheaters] = useState<string[]>([]);
+  const [selectedMarket, setSelectedMarket] = useState("new-york-city");
   const [selectedMovie, setSelectedMovie] = useState("");
   const [movieTitle, setMovieTitle] = useState("");
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
@@ -2879,6 +3034,8 @@ export default function Home() {
                 selectedTheaters={selectedTheaters}
                 onSelect={setSelectedTheaters}
                 onNext={() => setStep("setup-movie")}
+                selectedMarket={selectedMarket}
+                onMarketChange={setSelectedMarket}
               />
             )}
 
@@ -3157,6 +3314,15 @@ export default function Home() {
               <div style={{ marginTop: "var(--space-xl)" }}>
                 <SaleHistoryBadge movieSlug={selectedMovie} />
               </div>
+            )}
+
+            {/* ===== COMPETITOR COMPARISON ===== */}
+            {movieTitle && (
+              <CompetitorComparison
+                market={selectedMarket}
+                movieTitle={movieTitle}
+                selectedDate={selectedDates[0]}
+              />
             )}
 
             {/* ===== NEWS FEED ===== */}
