@@ -1595,14 +1595,35 @@ function MovieSetup({
   useEffect(() => {
     if (theaters.length === 0) return;
     setLoading(true);
-    const today = toDateStr(new Date());
-    fetch(`/api/movies?theater=${theaters[0]}&date=${today}`)
-      .then((r) => r.json())
-      .then((data: { movies: MovieInfo[] }) => {
-        setMovies(data.movies || []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    // Try today + next 6 days so upcoming releases (not yet playing today) still appear
+    const dates: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      dates.push(toDateStr(d));
+    }
+    Promise.all(
+      dates.map((date) =>
+        fetch(`/api/movies?theater=${theaters[0]}&date=${date}`)
+          .then((r) => r.json())
+          .then((data: { movies: MovieInfo[] }) => data.movies || [])
+          .catch(() => [] as MovieInfo[])
+      )
+    ).then((results) => {
+      // Merge and deduplicate by slug, preserving first-seen order
+      const seen = new Set<string>();
+      const merged: MovieInfo[] = [];
+      for (const batch of results) {
+        for (const m of batch) {
+          if (!seen.has(m.slug)) {
+            seen.add(m.slug);
+            merged.push(m);
+          }
+        }
+      }
+      setMovies(merged);
+      setLoading(false);
+    });
   }, [theaters]);
 
   return (
@@ -2375,6 +2396,9 @@ export default function Home() {
           phone: subChannel !== "email" ? subPhone : undefined,
           abVariant,
           refCode: inboundRefCode || undefined,
+          movieSlug: selectedMovie || undefined,
+          movieTitle: movieTitle || undefined,
+          theaterSlugs: selectedTheaters.length > 0 ? selectedTheaters : undefined,
         }),
       });
       const data = await resp.json();
