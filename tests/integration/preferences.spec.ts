@@ -51,16 +51,36 @@ function normalizeTheaterSlugs(slugs: unknown): string[] | null {
   return null;
 }
 
+/** Mirrors notificationChannel validation from PATCH handler */
+function validateNotificationChannel(channel: unknown): "email" | "sms" | "both" {
+  const validChannels = ["email", "sms", "both"];
+  if (typeof channel === "string" && validChannels.includes(channel)) return channel as "email" | "sms" | "both";
+  return "email";
+}
+
+/** Mirrors phone number validation from PATCH handler */
+function validatePhone(
+  channel: "email" | "sms" | "both",
+  phoneNumber: unknown
+): { ok: true; phone: string | null } | { ok: false; error: string } {
+  const needsPhone = channel === "sms" || channel === "both";
+  const phone = typeof phoneNumber === "string" && phoneNumber.trim().length > 0 ? phoneNumber.trim() : null;
+  if (needsPhone && !phone) return { ok: false, error: "Phone number required for SMS notifications" };
+  return { ok: true, phone: needsPhone ? phone : null };
+}
+
 interface MockSubscriber {
   email: string;
   dates: string;
   theater_slugs: string | null;
+  phone_number: string | null;
+  notification_channel: string | null;
   active: number;
 }
 
 type PreferencesGetOutcome =
   | { type: "not-found" }
-  | { type: "found"; dates: string[]; theaterSlugs: string[] | null; active: boolean };
+  | { type: "found"; dates: string[]; theaterSlugs: string[] | null; notificationChannel: string; phoneNumber: string | null; active: boolean };
 
 function simulateGetPreferences(row: MockSubscriber | null): PreferencesGetOutcome {
   if (!row) return { type: "not-found" };
@@ -68,22 +88,31 @@ function simulateGetPreferences(row: MockSubscriber | null): PreferencesGetOutco
   try { dates = JSON.parse(row.dates); } catch { /* empty */ }
   let theaterSlugs: string[] | null = null;
   try { theaterSlugs = row.theater_slugs ? JSON.parse(row.theater_slugs) : null; } catch { /* null */ }
-  return { type: "found", dates, theaterSlugs, active: !!row.active };
+  return {
+    type: "found",
+    dates,
+    theaterSlugs,
+    notificationChannel: row.notification_channel ?? "email",
+    phoneNumber: row.phone_number ?? null,
+    active: !!row.active,
+  };
 }
 
 type PreferencesPatchOutcome =
   | { type: "not-found" }
   | { type: "inactive" }
-  | { type: "updated"; dates: string[]; theaterSlugs: string[] | null };
+  | { type: "updated"; dates: string[]; theaterSlugs: string[] | null; notificationChannel: string; phoneNumber: string | null };
 
 function simulatePatchPreferences(
   row: MockSubscriber | null,
   validDates: string[],
-  theaterSlugs: string[] | null
+  theaterSlugs: string[] | null,
+  notificationChannel: "email" | "sms" | "both" = "email",
+  phoneNumber: string | null = null
 ): PreferencesPatchOutcome {
   if (!row) return { type: "not-found" };
   if (!row.active) return { type: "inactive" };
-  return { type: "updated", dates: validDates, theaterSlugs };
+  return { type: "updated", dates: validDates, theaterSlugs, notificationChannel, phoneNumber };
 }
 
 /* =========================================================================
@@ -136,6 +165,8 @@ describe("Preferences GET — subscriber found → 200", () => {
       email: "user@example.com",
       dates: '["2026-04-01","2026-04-02"]',
       theater_slugs: '["amc-lincoln-square-13","amc-empire-25"]',
+      phone_number: null,
+      notification_channel: "email",
       active: 1,
     };
     const result = simulateGetPreferences(row);
@@ -152,6 +183,8 @@ describe("Preferences GET — subscriber found → 200", () => {
       email: "user@example.com",
       dates: '["2026-04-01"]',
       theater_slugs: null,
+      phone_number: null,
+      notification_channel: null,
       active: 1,
     };
     const result = simulateGetPreferences(row);
@@ -229,6 +262,8 @@ describe("Preferences PATCH — DB path simulation", () => {
       email: "user@example.com",
       dates: "[]",
       theater_slugs: null,
+      phone_number: null,
+      notification_channel: null,
       active: 0,
     };
     const result = simulatePatchPreferences(row, dates, null);
@@ -240,6 +275,8 @@ describe("Preferences PATCH — DB path simulation", () => {
       email: "user@example.com",
       dates: '["2026-04-01"]',
       theater_slugs: null,
+      phone_number: null,
+      notification_channel: "email",
       active: 1,
     };
     const result = simulatePatchPreferences(row, dates, null);
@@ -255,6 +292,8 @@ describe("Preferences PATCH — DB path simulation", () => {
       email: "user@example.com",
       dates: '["2026-04-01"]',
       theater_slugs: null,
+      phone_number: null,
+      notification_channel: "email",
       active: 1,
     };
     const theaters = ["amc-lincoln-square-13", "amc-empire-25"];
@@ -262,6 +301,197 @@ describe("Preferences PATCH — DB path simulation", () => {
     expect(result.type).toBe("updated");
     if (result.type === "updated") {
       expect(result.theaterSlugs).toEqual(theaters);
+    }
+  });
+});
+
+/* =========================================================================
+   NOTIFICATION CHANNEL — Validation
+   ========================================================================= */
+
+describe("Notification channel validation", () => {
+  it("'email' is valid → returns 'email'", () => {
+    expect(validateNotificationChannel("email")).toBe("email");
+  });
+
+  it("'sms' is valid → returns 'sms'", () => {
+    expect(validateNotificationChannel("sms")).toBe("sms");
+  });
+
+  it("'both' is valid → returns 'both'", () => {
+    expect(validateNotificationChannel("both")).toBe("both");
+  });
+
+  it("invalid string falls back to 'email'", () => {
+    expect(validateNotificationChannel("push")).toBe("email");
+  });
+
+  it("undefined falls back to 'email'", () => {
+    expect(validateNotificationChannel(undefined)).toBe("email");
+  });
+
+  it("null falls back to 'email'", () => {
+    expect(validateNotificationChannel(null)).toBe("email");
+  });
+});
+
+describe("Phone number validation", () => {
+  it("email channel — phone not required, returns null", () => {
+    const result = validatePhone("email", null);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.phone).toBeNull();
+  });
+
+  it("email channel — phone provided but ignored (returns null)", () => {
+    const result = validatePhone("email", "+15551234567");
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.phone).toBeNull();
+  });
+
+  it("sms channel — valid phone → ok", () => {
+    const result = validatePhone("sms", "+15551234567");
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.phone).toBe("+15551234567");
+  });
+
+  it("sms channel — missing phone → error", () => {
+    const result = validatePhone("sms", null);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/phone number required/i);
+  });
+
+  it("sms channel — empty string → error", () => {
+    const result = validatePhone("sms", "");
+    expect(result.ok).toBe(false);
+  });
+
+  it("both channel — valid phone → ok", () => {
+    const result = validatePhone("both", "+15559876543");
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.phone).toBe("+15559876543");
+  });
+
+  it("both channel — missing phone → error", () => {
+    const result = validatePhone("both", undefined);
+    expect(result.ok).toBe(false);
+  });
+
+  it("sms channel — trims whitespace", () => {
+    const result = validatePhone("sms", "  +15551234567  ");
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.phone).toBe("+15551234567");
+  });
+});
+
+/* =========================================================================
+   NOTIFICATION CHANNEL — GET returns channel + phone
+   ========================================================================= */
+
+describe("Preferences GET — notificationChannel + phoneNumber in response", () => {
+  it("email subscriber returns channel=email, phoneNumber=null", () => {
+    const row: MockSubscriber = {
+      email: "user@example.com",
+      dates: '["2026-04-01"]',
+      theater_slugs: null,
+      phone_number: null,
+      notification_channel: "email",
+      active: 1,
+    };
+    const result = simulateGetPreferences(row);
+    expect(result.type).toBe("found");
+    if (result.type === "found") {
+      expect(result.notificationChannel).toBe("email");
+      expect(result.phoneNumber).toBeNull();
+    }
+  });
+
+  it("sms subscriber returns channel=sms + phone", () => {
+    const row: MockSubscriber = {
+      email: "sms@example.com",
+      dates: '["2026-04-01"]',
+      theater_slugs: null,
+      phone_number: "+15551234567",
+      notification_channel: "sms",
+      active: 1,
+    };
+    const result = simulateGetPreferences(row);
+    if (result.type === "found") {
+      expect(result.notificationChannel).toBe("sms");
+      expect(result.phoneNumber).toBe("+15551234567");
+    }
+  });
+
+  it("both subscriber returns channel=both + phone", () => {
+    const row: MockSubscriber = {
+      email: "both@example.com",
+      dates: '["2026-04-01"]',
+      theater_slugs: null,
+      phone_number: "+15559876543",
+      notification_channel: "both",
+      active: 1,
+    };
+    const result = simulateGetPreferences(row);
+    if (result.type === "found") {
+      expect(result.notificationChannel).toBe("both");
+      expect(result.phoneNumber).toBe("+15559876543");
+    }
+  });
+
+  it("null notification_channel defaults to 'email'", () => {
+    const row: MockSubscriber = {
+      email: "legacy@example.com",
+      dates: '["2026-04-01"]',
+      theater_slugs: null,
+      phone_number: null,
+      notification_channel: null,
+      active: 1,
+    };
+    const result = simulateGetPreferences(row);
+    if (result.type === "found") {
+      expect(result.notificationChannel).toBe("email");
+    }
+  });
+});
+
+/* =========================================================================
+   NOTIFICATION CHANNEL — PATCH persists channel + phone
+   ========================================================================= */
+
+describe("Preferences PATCH — notification channel persisted in update", () => {
+  const dates = ["2026-04-01", "2026-04-02"];
+  const activeRow: MockSubscriber = {
+    email: "user@example.com",
+    dates: '["2026-04-01"]',
+    theater_slugs: null,
+    phone_number: null,
+    notification_channel: "email",
+    active: 1,
+  };
+
+  it("email channel persisted", () => {
+    const result = simulatePatchPreferences(activeRow, dates, null, "email", null);
+    expect(result.type).toBe("updated");
+    if (result.type === "updated") {
+      expect(result.notificationChannel).toBe("email");
+      expect(result.phoneNumber).toBeNull();
+    }
+  });
+
+  it("sms channel with phone number persisted", () => {
+    const result = simulatePatchPreferences(activeRow, dates, null, "sms", "+15551234567");
+    expect(result.type).toBe("updated");
+    if (result.type === "updated") {
+      expect(result.notificationChannel).toBe("sms");
+      expect(result.phoneNumber).toBe("+15551234567");
+    }
+  });
+
+  it("both channel with phone number persisted", () => {
+    const result = simulatePatchPreferences(activeRow, dates, null, "both", "+15559876543");
+    expect(result.type).toBe("updated");
+    if (result.type === "updated") {
+      expect(result.notificationChannel).toBe("both");
+      expect(result.phoneNumber).toBe("+15559876543");
     }
   });
 });
