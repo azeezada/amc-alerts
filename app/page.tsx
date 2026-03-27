@@ -2117,6 +2117,13 @@ export default function Home() {
                   {subscriberCount === 1 ? "person" : "people"} watching for tickets
                 </span>
               )}
+              <a
+                href="/group/new"
+                className="btn-ghost"
+                style={{ fontSize: "var(--text-xs)", textDecoration: "none" }}
+              >
+                👥 Plan with friends
+              </a>
               <button
                 onClick={handleShare}
                 className="btn-ghost"

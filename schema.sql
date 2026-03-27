@@ -17,3 +17,22 @@ CREATE TABLE IF NOT EXISTS showtime_cache (
   data TEXT,
   checked_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS groups (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  host_name TEXT NOT NULL,
+  host_email TEXT,
+  movie_slug TEXT DEFAULT 'project-hail-mary-76779',
+  movie_title TEXT DEFAULT 'Project Hail Mary',
+  theater_slugs TEXT DEFAULT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS group_members (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id TEXT NOT NULL REFERENCES groups(id),
+  member_name TEXT NOT NULL,
+  voted_showtimes TEXT DEFAULT '[]',
+  joined_at TEXT DEFAULT (datetime('now'))
+);
