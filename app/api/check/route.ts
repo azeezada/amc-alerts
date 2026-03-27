@@ -176,6 +176,18 @@ async function runCheck(_request: NextRequest) {
               if (isNew) {
                 if (!newlyAvailableByTheater[theaterSlug]) newlyAvailableByTheater[theaterSlug] = [];
                 newlyAvailableByTheater[theaterSlug].push(dateResult);
+
+                // Record first-seen in ticket_history (INSERT OR IGNORE preserves original first_seen_at)
+                try {
+                  await db
+                    .prepare(
+                      "INSERT OR IGNORE INTO ticket_history (movie_slug, showtime_date, theater_slug, format_tag) VALUES (?, ?, ?, ?)"
+                    )
+                    .bind(movieSlug, date, theaterSlug, formatTag)
+                    .run();
+                } catch (_) {
+                  // Table may not exist yet on old deployments
+                }
               }
 
               // Update cache

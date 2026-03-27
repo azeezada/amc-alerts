@@ -1932,6 +1932,59 @@ interface NewsArticle {
   source: string;
 }
 
+interface SaleHistoryEntry {
+  movie_slug: string;
+  first_on_sale_at: string | null;
+  release_date: string | null;
+  days_before_release: number | null;
+  total_history_entries: number;
+}
+
+function SaleHistoryBadge({ movieSlug }: { movieSlug: string }) {
+  const [entry, setEntry] = useState<SaleHistoryEntry | null>(null);
+
+  useEffect(() => {
+    fetch("/api/history")
+      .then((r) => r.json())
+      .then((data: { movies?: SaleHistoryEntry[] }) => {
+        const match = data.movies?.find((m) => m.movie_slug === movieSlug);
+        if (match) setEntry(match);
+      })
+      .catch(() => {});
+  }, [movieSlug]);
+
+  if (!entry || entry.days_before_release === null) return null;
+
+  const saleDate = entry.first_on_sale_at
+    ? new Date(entry.first_on_sale_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : null;
+
+  return (
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        background: "rgba(255,255,255,0.06)",
+        border: "1px solid var(--border-subtle)",
+        borderRadius: 8,
+        padding: "6px 12px",
+        fontSize: "var(--text-sm)",
+        color: "var(--text-secondary)",
+      }}
+    >
+      <span style={{ fontSize: 16 }}>📅</span>
+      <span>
+        Tickets went on sale{" "}
+        <strong style={{ color: "var(--text-primary)" }}>
+          {entry.days_before_release} day{entry.days_before_release !== 1 ? "s" : ""} before opening
+        </strong>
+        {saleDate ? ` (${saleDate})` : ""}
+      </span>
+    </div>
+  );
+}
+
 function NewsSection({ articles }: { articles: NewsArticle[] }) {
   if (articles.length === 0) return null;
 
@@ -3098,6 +3151,13 @@ export default function Home() {
               </div>
 
             </div>
+
+            {/* ===== SALE HISTORY BADGE ===== */}
+            {selectedMovie && (
+              <div style={{ marginTop: "var(--space-xl)" }}>
+                <SaleHistoryBadge movieSlug={selectedMovie} />
+              </div>
+            )}
 
             {/* ===== NEWS FEED ===== */}
             <NewsSection articles={newsArticles} />

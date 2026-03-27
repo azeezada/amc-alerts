@@ -80,3 +80,15 @@ CREATE TABLE IF NOT EXISTS discussions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_discussions_showtime ON discussions(showtime_id, created_at);
+
+CREATE TABLE IF NOT EXISTS ticket_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  movie_slug TEXT NOT NULL,
+  showtime_date TEXT NOT NULL,
+  theater_slug TEXT NOT NULL,
+  format_tag TEXT NOT NULL,
+  first_seen_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(movie_slug, showtime_date, theater_slug, format_tag)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ticket_history_movie ON ticket_history(movie_slug, first_seen_at);
