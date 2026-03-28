@@ -11,6 +11,10 @@ export interface Showtime {
   url: string;
   /** Discount/promo label from AMC listing page, e.g. "20% OFF", "UP TO 15% OFF" */
   promo?: string;
+  /** True when the showtime offers Closed Caption (CC) services */
+  closedCaption?: boolean;
+  /** True when the showtime offers Audio Description (AD) services */
+  audioDescription?: boolean;
 }
 
 export interface DateResult {
@@ -190,6 +194,22 @@ export function extractFormatShowtimes(html: string, formatTag: string): Showtim
       .filter((p) => p.length > 0 && !STATUS_KEYWORDS.includes(p.toLowerCase()));
     const promo = promoParts.length > 0 ? promoParts.join(", ") : undefined;
 
+    // Extract accessibility attributes from the -attributes section referenced by aria-describedby.
+    // The last space-separated token in aria-describedby is the ID of a <ul> listing showtime
+    // attributes such as "Closed Caption" and "Audio Description".
+    let closedCaption: boolean | undefined;
+    let audioDescription: boolean | undefined;
+    const attributesId = match[1].split(" ").filter((t) => t.endsWith("-attributes")).pop();
+    if (attributesId) {
+      const attrIdPos = html.indexOf(`id="${attributesId}"`);
+      if (attrIdPos !== -1) {
+        const ulEnd = html.indexOf("</ul>", attrIdPos);
+        const attrChunk = (ulEnd !== -1 ? html.slice(attrIdPos, ulEnd) : html.slice(attrIdPos, attrIdPos + 600)).toLowerCase();
+        if (attrChunk.includes("closed caption")) closedCaption = true;
+        if (attrChunk.includes("audio description")) audioDescription = true;
+      }
+    }
+
     showtimes.push({
       id,
       time,
@@ -197,6 +217,8 @@ export function extractFormatShowtimes(html: string, formatTag: string): Showtim
       status,
       url: `https://www.amctheatres.com/showtimes/${id}`,
       ...(promo !== undefined && { promo }),
+      ...(closedCaption && { closedCaption }),
+      ...(audioDescription && { audioDescription }),
     });
   }
 

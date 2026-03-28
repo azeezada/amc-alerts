@@ -13,6 +13,8 @@ interface Showtime {
   status: string;
   url: string;
   promo?: string;
+  closedCaption?: boolean;
+  audioDescription?: boolean;
 }
 
 interface DateResult {
@@ -208,6 +210,55 @@ function StatusBadge({ status }: { status: string }) {
         className={status === "Sellable" ? "pulse-dot" : undefined}
       />
       {label}
+    </span>
+  );
+}
+
+/* =========================================================================
+   Accessibility Badges — CC / AD
+   ========================================================================= */
+function AccessibilityBadges({ closedCaption, audioDescription }: { closedCaption?: boolean; audioDescription?: boolean }) {
+  if (!closedCaption && !audioDescription) return null;
+  return (
+    <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
+      {closedCaption && (
+        <span
+          title="Closed Caption available"
+          aria-label="Closed Caption"
+          data-testid="cc-badge"
+          style={{
+            fontSize: "var(--text-xs)",
+            fontWeight: 700,
+            color: "#60A5FA",
+            background: "rgba(96, 165, 250, 0.12)",
+            border: "1px solid rgba(96, 165, 250, 0.3)",
+            borderRadius: 3,
+            padding: "1px 5px",
+            letterSpacing: "0.03em",
+          }}
+        >
+          CC
+        </span>
+      )}
+      {audioDescription && (
+        <span
+          title="Audio Description available"
+          aria-label="Audio Description"
+          data-testid="ad-badge"
+          style={{
+            fontSize: "var(--text-xs)",
+            fontWeight: 700,
+            color: "#A78BFA",
+            background: "rgba(167, 139, 250, 0.12)",
+            border: "1px solid rgba(167, 139, 250, 0.3)",
+            borderRadius: 3,
+            padding: "1px 5px",
+            letterSpacing: "0.03em",
+          }}
+        >
+          AD
+        </span>
+      )}
     </span>
   );
 }
@@ -949,6 +1000,7 @@ function DateCard({
                     {st.promo}
                   </span>
                 )}
+                <AccessibilityBadges closedCaption={st.closedCaption} audioDescription={st.audioDescription} />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", flexWrap: "wrap" }}>
                 <RsvpButton showtimeId={st.id} />
@@ -1208,7 +1260,7 @@ function ComparisonGrid({
                                 rel="noopener noreferrer"
                                 data-testid={`buy-tickets-${st.id}`}
                                 data-showtime-id={st.id}
-                                title={st.promo || undefined}
+                                title={[st.promo, st.closedCaption && "Closed Caption", st.audioDescription && "Audio Description"].filter(Boolean).join(" · ") || undefined}
                                 style={{
                                   display: "inline-block",
                                   padding: "4px 8px",
@@ -1220,6 +1272,7 @@ function ComparisonGrid({
                                   fontWeight: 600,
                                   cursor: st.status === "SoldOut" ? "not-allowed" : "pointer",
                                   transition: "all var(--dur-fast) var(--ease-default)",
+                                  textAlign: "center",
                                 }}
                                 onMouseEnter={(e) => {
                                   if (st.status !== "SoldOut") {
@@ -1235,6 +1288,11 @@ function ComparisonGrid({
                                 }}
                               >
                                 {st.time}
+                                {(st.closedCaption || st.audioDescription) && (
+                                  <span style={{ fontSize: 9, display: "block", opacity: 0.8, fontWeight: 600, letterSpacing: "0.03em" }}>
+                                    {[st.closedCaption && "CC", st.audioDescription && "AD"].filter(Boolean).join(" ")}
+                                  </span>
+                                )}
                               </a>
                             ))}
                           </div>

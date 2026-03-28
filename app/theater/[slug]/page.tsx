@@ -335,6 +335,37 @@ export default function TheaterInfoPage() {
           </div>
         )}
 
+        {/* Accessibility */}
+        <div style={cardStyle} data-testid="accessibility-section">
+          <div style={sectionLabelStyle}>Accessibility</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
+            {[
+              { icon: "♿", label: "Wheelchair accessible", note: "ADA-compliant entrance, restrooms & seating areas", color: "#38bdf8" },
+              { icon: "💬", label: "Closed Captions (CC)", note: "Available on select screenings — look for the CC badge", color: "#60A5FA" },
+              { icon: "🔊", label: "Audio Description (AD)", note: "Available on select screenings — look for the AD badge", color: "#A78BFA" },
+            ].map((item) => (
+              <div
+                key={item.label}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "var(--space-sm)",
+                  padding: "var(--space-sm) var(--space-md)",
+                  background: "var(--bg-base)",
+                  borderRadius: 6,
+                  border: `1px solid ${item.color}22`,
+                }}
+              >
+                <span style={{ fontSize: 18, lineHeight: 1.4, flexShrink: 0 }}>{item.icon}</span>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: "var(--text-sm)", color: item.color }}>{item.label}</div>
+                  <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginTop: 2 }}>{item.note}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Back to showtimes CTA */}
         <div
           style={{
