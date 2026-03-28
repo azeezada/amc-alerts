@@ -1,5 +1,11 @@
 // Curated AMC theater database by market
 
+export interface SeatTip {
+  format: string;
+  headline: string;
+  tips: string[];
+}
+
 export interface TheaterInfo {
   slug: string;
   name: string;
@@ -11,6 +17,7 @@ export interface TheaterInfo {
   amenities?: string[];
   phone?: string;
   transitTips?: string[];
+  seatTips?: SeatTip[];
 }
 
 export interface Market {
@@ -67,6 +74,30 @@ export const POPULAR_THEATERS: Record<string, TheaterInfo[]> = {
         "Bus: M7, M11, M104 all stop on Broadway near 66th St",
         "Bike: Citi Bike stations at Broadway & W 67th and W 65th",
       ],
+      seatTips: [
+        {
+          format: "IMAX 70mm",
+          headline: "World's largest IMAX screen — pick your row carefully",
+          tips: [
+            "Sweet spot: center section, rows D–H. The steep rake puts you perfectly aligned with the screen's midpoint.",
+            "Avoid rows A–C: the screen towers over 80 ft tall and those seats force you to look nearly straight up.",
+            "Rows D–F give maximum immersion; rows G–J offer a slightly more relaxed, balanced perspective.",
+            "Stay in the center block (roughly seats 6–14 out of ~20 per row) — the side sections lose the symmetrical audio and curved screen benefits.",
+            "If comfort matters more than immersion, rows K–L are further back but recliners and the steep rake still provide a great view.",
+          ],
+        },
+        {
+          format: "Dolby Cinema",
+          headline: "Dolby sweet spot: center rows, dead center",
+          tips: [
+            "Prime position: dead center, rows G–K. Atmos audio is calibrated to this zone and the laser image is sharpest here.",
+            "Recliner seating means any row D–L is premium — tilt back and let the sound wrap around you.",
+            "Avoid the very back row (row N+): overhead Atmos channels sound more diffuse the further you sit from the calibration point.",
+            "Center aisle seats in rows G–K are the most sought-after — book early.",
+            "Skip the far ends of any row: the curved Dolby screen creates slight geometry distortion at extreme angles.",
+          ],
+        },
+      ],
     },
     {
       slug: "amc-empire-25",
@@ -97,6 +128,28 @@ export const POPULAR_THEATERS: Record<string, TheaterInfo[]> = {
         "Bus: M42 crosstown, M10, M11 on 8th Ave",
         "Walking: 5 min from Penn Station",
       ],
+      seatTips: [
+        {
+          format: "IMAX",
+          headline: "Empire IMAX: go center, go mid-row",
+          tips: [
+            "Best seats: center block, rows E–I. The screen is large and the mid-rows keep the image at a natural angle.",
+            "Avoid the front 3 rows — Empire's IMAX is tall and the close seats cause neck fatigue on long films.",
+            "Stay in the center ~60% of any row; outer seats lose the surround audio sweet spot.",
+            "Rows J and above are further back but more comfortable for 2+ hour films — trade some immersion for neck relief.",
+          ],
+        },
+        {
+          format: "Dolby Cinema",
+          headline: "Empire Dolby: aim for the calibration zone",
+          tips: [
+            "Optimal zone: center section, rows H–L. This is where Atmos spatial audio is most precisely delivered.",
+            "The elevated back rows (H+) naturally align your ears with the primary speaker array.",
+            "Avoid front-row Dolby seats — you'll hear the subwoofer-heavy bass more than the spatial audio design.",
+            "Aisle seats in rows H–K let you enjoy prime audio without sacrificing easy exit.",
+          ],
+        },
+      ],
     },
     {
       slug: "amc-kips-bay-15",
@@ -124,6 +177,19 @@ export const POPULAR_THEATERS: Record<string, TheaterInfo[]> = {
         "Subway: 6 train to 33rd St (walk 5 blocks north) or 28th St (walk 5 blocks south)",
         "Bus: M15 and M15-SBS on 2nd Ave stop right outside; M34 crosstown",
         "Bike: Citi Bike station at 2nd Ave & E 34th St",
+      ],
+      seatTips: [
+        {
+          format: "IMAX",
+          headline: "Kips Bay IMAX: standard digital, flexible seating",
+          tips: [
+            "Sweet spot: center section, rows D–H. The screen is large but has a gentler rake than Lincoln Square.",
+            "Avoid rows A–C: too close, the viewing angle becomes uncomfortable quickly.",
+            "Center seats (avoid the outer 15% of seats on either side) give the best IMAX audio imaging.",
+            "This is digital IMAX — not the 70mm film format at Lincoln Square — so seating flexibility is greater and more rows are comfortable.",
+            "Rows I–K are a relaxed fallback if the preferred rows are sold out.",
+          ],
+        },
       ],
     },
     {
@@ -220,6 +286,26 @@ export const POPULAR_THEATERS: Record<string, TheaterInfo[]> = {
       amenities: ["IMAX 70mm", "Dolby Cinema", "Reserved seating", "Full bar", "Wheelchair accessible"],
       parkingTips: ["Westfield Century City mall parking — validated with ticket purchase", "Street parking limited; use mall structure"],
       transitTips: ["Bus: Big Blue Bus Line 7; Metro Rapid 720 to Century City"],
+      seatTips: [
+        {
+          format: "IMAX 70mm",
+          headline: "Century City IMAX 70mm sweet spot",
+          tips: [
+            "Center section, rows E–I: the raked seating puts you at eye level with the screen's midpoint.",
+            "Avoid rows A–C for the same reason as any 70mm screen — it's massive and front seats strain your neck.",
+            "Stay in the center block (avoid outer third of seats); side seats lose the curved projection geometry.",
+          ],
+        },
+        {
+          format: "Dolby Cinema",
+          headline: "Dolby sweet spot at Century City",
+          tips: [
+            "Rows G–K, center block: the Atmos calibration zone and sharpest laser image overlap here.",
+            "Recliner seats make most rows comfortable, but the center mid-rows are still the audio pinnacle.",
+            "Avoid the very back rows — Atmos height channels lose precision beyond the design range.",
+          ],
+        },
+      ],
     },
     {
       slug: "amc-burbank-16",
@@ -288,6 +374,18 @@ export const POPULAR_THEATERS: Record<string, TheaterInfo[]> = {
       amenities: ["IMAX 70mm", "Reserved seating", "Wheelchair accessible"],
       parkingTips: ["Navy Pier Parking Garage (enter from Illinois St) — validated", "Surface lots along Grand Ave"],
       transitTips: ["Bus: 29 State to Navy Pier; free water taxi from Michigan Ave", "Walkable from Streeterville hotels"],
+      seatTips: [
+        {
+          format: "IMAX 70mm",
+          headline: "Navy Pier IMAX 70mm: one of Chicago's best screens",
+          tips: [
+            "Center section, rows D–H: optimal alignment with the full 70mm frame.",
+            "The theater has a steeper rake than most — this means even row D is at a comfortable angle.",
+            "Avoid front 2 rows: the screen's height makes them uncomfortable for long films.",
+            "Center block seats (middle ~50% of the row) capture the full surround sound design.",
+          ],
+        },
+      ],
     },
     {
       slug: "amc-block-37",
@@ -312,6 +410,26 @@ export const POPULAR_THEATERS: Record<string, TheaterInfo[]> = {
       amenities: ["IMAX 70mm", "16 screens", "Dolby Cinema", "Reserved seating", "Bar", "Wheelchair accessible"],
       parkingTips: ["5th & Mission Garage (1 block) — AMC validation available", "Yerba Buena Garage on 3rd St"],
       transitTips: ["BART: Powell St or Montgomery (both 5-10 min walk)", "Muni: Multiple lines on Market St"],
+      seatTips: [
+        {
+          format: "IMAX 70mm",
+          headline: "Metreon IMAX 70mm: SF's premier large-format screen",
+          tips: [
+            "Sweet spot: center section, rows E–I. The IMAX 70mm auditorium has a good rake that makes center mid-rows excellent.",
+            "Avoid the front 3 rows — the screen's height makes these seats uncomfortable for full-length films.",
+            "Center block (avoid seats at the extreme ends) for the best audio and optical geometry.",
+          ],
+        },
+        {
+          format: "Dolby Cinema",
+          headline: "Dolby at Metreon: world-class sound",
+          tips: [
+            "Rows G–K center: the Atmos sweet spot where all speaker layers converge most precisely.",
+            "The Metreon Dolby auditorium is known for excellent bass management — center rows avoid any bass node buildup.",
+            "Recliner seats throughout, but center mid-rows book fastest — reserve early.",
+          ],
+        },
+      ],
     },
     {
       slug: "amc-kabuki-8",
