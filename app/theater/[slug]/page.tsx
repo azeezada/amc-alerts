@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { getTheaterBySlug, getMarketForTheater, MARKETS, getAmenityBadge } from "../../../lib/theaters";
+import { getTheaterBySlug, getMarketForTheater, MARKETS, getAmenityBadge, SeatTip } from "../../../lib/theaters";
 
 export default function TheaterInfoPage() {
   const params = useParams();
@@ -331,6 +331,84 @@ export default function TheaterInfoPage() {
                   </span>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* Best Seats */}
+        {theater.seatTips && theater.seatTips.length > 0 && (
+          <div style={cardStyle} data-testid="best-seats-section">
+            <div style={sectionLabelStyle}>Best Seats by Format</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-md)" }}>
+              {theater.seatTips.map((tip: SeatTip) => (
+                <div
+                  key={tip.format}
+                  style={{
+                    background: "var(--bg-base)",
+                    border: "1px solid var(--border-default, #333333)",
+                    borderRadius: 8,
+                    overflow: "hidden",
+                  }}
+                >
+                  {/* Format header */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "var(--space-sm)",
+                      padding: "var(--space-sm) var(--space-md)",
+                      borderBottom: "1px solid var(--border-default, #333333)",
+                      background: tip.format.includes("70mm")
+                        ? "#1a1a2e"
+                        : tip.format.toLowerCase().includes("dolby")
+                        ? "#0f1a2e"
+                        : "#141420",
+                    }}
+                  >
+                    <span style={{ fontSize: 16 }}>
+                      {tip.format.includes("70mm") ? "🎬" : tip.format.toLowerCase().includes("dolby") ? "🔊" : "📽"}
+                    </span>
+                    <div>
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: "var(--text-sm)",
+                          color: tip.format.includes("70mm")
+                            ? "#8888ff"
+                            : tip.format.toLowerCase().includes("dolby")
+                            ? "#66aaff"
+                            : "#aaaaff",
+                        }}
+                      >
+                        {tip.format}
+                      </div>
+                      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>{tip.headline}</div>
+                    </div>
+                  </div>
+                  {/* Tips list */}
+                  <ul
+                    style={{
+                      margin: 0,
+                      padding: "var(--space-md) var(--space-md) var(--space-md) calc(var(--space-lg) + var(--space-md))",
+                      listStyle: "disc",
+                    }}
+                  >
+                    {tip.tips.map((t: string, i: number) => (
+                      <li
+                        key={i}
+                        style={{
+                          color: "var(--text-secondary)",
+                          fontSize: "var(--text-sm)",
+                          marginBottom: i < tip.tips.length - 1 ? "var(--space-sm)" : 0,
+                          lineHeight: "var(--leading-normal)",
+                        }}
+                      >
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
           </div>
         )}
